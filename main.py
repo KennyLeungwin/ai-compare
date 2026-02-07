@@ -168,16 +168,6 @@ with st.sidebar:
         • 256k 上下文
         """)
 
-        # Mistral 特有设置
-        st.divider()
-        st.caption("🦉 **Mistral 特有设置**")
-       # mistral_safe_mode = st.toggle(
-       #     "启用内容安全过滤 (safe_prompt)",
-       #     value=False,
-       #     key="mistral_safe_mode"
-       # )
-       # MODEL_CONFIG["mistral"]["params"]["safe_prompt"] = mistral_safe_mode
-
     if enabled_models.get("qwen", False):
         with st.expander("🌸 Qwen 专属增强"):
             st.session_state.enable_qwen_search = st.checkbox(
@@ -236,25 +226,25 @@ for message in st.session_state.messages:
 # 6. AI 调用函数（融合 Mistral）
 def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
     config = MODEL_CONFIG[model_id]
-    
+
     with col_obj:
         st.markdown(f"### {config['emoji']} [{config['name']}]({config['web_url']})")
-        
+
         api_key = os.getenv(config['env_key'])
         if not api_key:
             st.warning(f"请设置 {config['env_key']}")
             return None
-        
+
         if not enabled_models.get(model_id, True):
             st.info("⏸️ 模型已禁用")
             return None
-        
+
         try:
             client = OpenAI(
                 api_key=api_key,
                 base_url=config['base_url']
             )
-            
+
             # ========== Kimi K2.5 ==========
             if model_id == "kimi" and st.session_state.get("kimi_k25_enabled", True):
                 params = {
@@ -265,25 +255,25 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                     "temperature": 1.0
                 }
                 st.caption("🌙 Kimi K2.5 | 温度: 1 (固定) | 32k 输出")
-                
-                with st.status("🌙 Kimi 思考中...", expanded=False) as status:
+
+                with st.status("🌙 Kimi 思考中...", expanded=True) as status:
                     st.write("使用模型: kimi-k2.5")
                     response = client.chat.completions.create(**params)
                     answer = response.choices[0].message.content
-                    
+
                     if hasattr(response, 'usage') and response.usage is not None:
                         st.write(f"Tokens: {response.usage.total_tokens}")
-                    status.update(label="✅ 完成！", state="complete")
-                
-                st.markdown(answer)
+                    status.update(label="✅ 完成！", state="complete", expanded=True)
+
+                st.write(answer)
                 st.session_state.model_responses[model_id] = {
-                    "answer": answer, 
+                    "answer": answer,
                     "model": "kimi-k2.5",
                     "temperature": 1
                 }
                 return answer
-            
-            # ========== Mistral AI ==========  ← 修复：此处缩进与上方 if 对齐
+
+            # ========== Mistral AI ==========
             elif model_id == "mistral":
                 params = {
                     "model": config["model"],
@@ -292,25 +282,25 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                     "max_tokens": config["params"]["max_tokens"],
                     "stream": False
                 }
-            
+
                 # 动态调整温度（根据问题类型）
                 last_user_msg = next((msg["content"] for msg in reversed(messages) if msg["role"] == "user"), "")
                 if "代码" in last_user_msg or "program" in last_user_msg.lower():
                     params["temperature"] = 0.3  # 代码问题降低随机性
                 elif "创意" in last_user_msg or "story" in last_user_msg.lower():
                     params["temperature"] = 0.9  # 创意写作提高随机性
-            
-                with st.status("🦉 Mistral 正在思考中...", expanded=False) as status:
+
+                with st.status("🦉 Mistral 正在思考中...", expanded=True) as status:
                     st.write(f"使用模型: {config['model']}")
                     try:
                         response = client.chat.completions.create(**params)
                         answer = response.choices[0].message.content
-            
+
                         if hasattr(response, 'usage') and response.usage is not None:
                             st.write(f"Tokens: {response.usage.total_tokens}")
-                        status.update(label="✅ 完成！", state="complete")
-            
-                        st.markdown(answer)
+                        status.update(label="✅ 完成！", state="complete", expanded=True)
+
+                        st.write(answer)
                         st.session_state.model_responses[model_id] = {
                             "answer": answer,
                             "model": config["model"]
@@ -319,7 +309,7 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                     except Exception as e:
                         st.error(f"Mistral 调用失败: {str(e)[:200]}")
                         return None
-            
+
             # ========== 其他模型（DeepSeek / Gemini / GPT / Qwen）==========
             else:
                 params = {
@@ -345,16 +335,16 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                         params.pop("stream", None)
 
                 # 调用 API
-                with st.status(f"{config['emoji']} 正在思考中...", expanded=False) as status:
+                with st.status(f"{config['emoji']} 正在思考中...", expanded=True) as status:
                     st.write(f"使用模型: {config['model']}")
                     response = client.chat.completions.create(**params)
                     answer = response.choices[0].message.content
-                    
+
                     if hasattr(response, 'usage') and response.usage is not None:
                         st.write(f"Tokens: {response.usage.total_tokens}")
-                    status.update(label=f"{config['emoji']} 完成！", state="complete")
+                    status.update(label=f"{config['emoji']} 完成！", state="complete", expanded=True)
 
-                st.markdown(answer)
+                st.write(answer)
                 st.session_state.model_responses[model_id] = {"answer": answer, "model": config['model']}
                 return answer
 
@@ -368,12 +358,12 @@ if prompt := st.chat_input("向AI模型提问..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
-    
+
     enabled_model_ids = [mid for mid in MODEL_CONFIG.keys() if enabled_models.get(mid, True)]
     if not enabled_model_ids:
         st.warning("⚠️ 请至少启用一个模型")
         st.stop()
-    
+
     cols = st.columns(len(enabled_model_ids))
     with st.spinner(f"正在同步调用 {len(enabled_model_ids)} 个模型..."):
         responses = {}
@@ -381,13 +371,13 @@ if prompt := st.chat_input("向AI模型提问..."):
             answer = ask_ai(model_id, cols[idx], st.session_state.messages)
             if answer:
                 responses[model_id] = answer
-        
+
         # 保留参考回答（可选）
         if responses:
             ref_order = ["deepseek", "qwen", "gemini", "kimi", "mistral", "gpt"]
             ref_model_id = next((mid for mid in ref_order if mid in responses), list(responses.keys())[0])
             st.session_state.messages.append({
-                "role": "assistant", 
+                "role": "assistant",
                 "content": f"[参考回答 - {MODEL_CONFIG[ref_model_id]['name']}]: {responses[ref_model_id]}"
             })
 
