@@ -69,11 +69,13 @@ if prompt := st.chat_input("向 5 个 AI 同时发起提问..."):
             "https://chat.deepseek.com/"
         )
         
-        # --- 2. Gemini 官方对话链接 ---
+    # --- 2. Gemini (终极排错版) ---
+        # 尝试使用 v1 稳定版路径，并手动去除 Key 可能存在的空格
+        gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
         ans_gemini = ask_ai(
-            os.getenv("GEMINI_API_KEY"), 
-            "https://generativelanguage.googleapis.com/v1beta/openai", 
-            "gemini-1.5-flash", 
+            gemini_key, 
+            "https://generativelanguage.googleapis.com/v1/openai/", # 改用 v1 路径，并保留末尾斜杠
+            "gemini-1.5-flash", # 不加 -latest，直接指向标准名
             cols[1], 
             "✨ Gemini", 
             "https://gemini.google.com/"
