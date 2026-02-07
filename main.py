@@ -123,7 +123,7 @@ with st.sidebar:
     for model_id, config in MODEL_CONFIG.items():
         key = os.getenv(config['env_key'])
         status = "✅ 已配置" if key else "❌ 未配置"
-        st.write(f"{config['emoji']} {config['name']}[{config['name']}]({config['web_url']})": {status}")
+        st.write(f"{config['emoji']} [{config['name']}]({config['web_url']}): {status}")
 
     st.write("---")
 
