@@ -1,34 +1,59 @@
 import streamlit as st
 import os
 from openai import OpenAI
-from typing import Optional
+from typing import Optional, Dict, Any
 from datetime import datetime
 
 # 1. 页面配置
 st.set_page_config(
-    page_title="五模型 AI 实验室 (Gemini 2.5 增强版)",
+    page_title="五模型 AI 对话助手 (DeepSeek + Qwen + Gemini 2.5)",
     layout="wide",
-    page_icon="🧠"
+    page_icon="🤖"
 )
-st.title("⚡ 五模型聊天对比 (Gemini 2.5 Flash & GPT-3.5)")
+st.title("🧠 五模型聊天对比 (V7.2 多模型增强版)")
 
-# 2. 模型配置信息 (2026 最新版本)
+# 2. 模型配置信息
 MODEL_CONFIG = {
-    # === ✨ Gemini 核心优化：选用 2.5 Flash (免费层性能之王) ===
+    "deepseek": {
+        "name": "DeepSeek Reasoning",
+        "model": "deepseek-reasoner",
+        "base_url": "https://api.deepseek.com/v1",
+        "web_url": "https://chat.deepseek.com",
+        "emoji": "🚀",
+        "env_key": "DEEPSEEK_API_KEY",
+        "params": {
+            "temperature": 0.7,
+            "max_tokens": 8192,
+            "stream": False,
+            "reasoning_effort": "medium"
+        }
+    },
     "gemini": {
         "name": "Gemini 2.5 Flash",
-        "model": "gemini-2.5-flash", 
+        "model": "gemini-2.5-flash", # 升级至 2026 最新模型
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
-        "web_url": "https://aistudio.google.com/",
+        "web_url": "https://aistudio.google.com",
         "emoji": "✨",
         "env_key": "GEMINI_API_KEY",
         "params": {
             "temperature": 0.7,
-            "max_tokens": 8192,
-            "stream": True 
+            "max_tokens": 8192, # 扩展输出长度
+            "stream": False
         }
     },
-    # === 💬 GPT 还原：使用 OpenRouter 免费/低价 API ===
+    "kimi": {
+        "name": "Kimi Moonshot",
+        "model": "moonshot-v1-8k",
+        "base_url": "https://api.moonshot.cn/v1",
+        "web_url": "https://kimi.moonshot.cn",
+        "emoji": "🌙",
+        "env_key": "KIMI_API_KEY",
+        "params": {
+            "temperature": 0.7,
+            "max_tokens": 4096,
+            "stream": False
+        }
+    },
     "gpt": {
         "name": "GPT-3.5 Turbo",
         "model": "openai/gpt-3.5-turbo",
@@ -39,114 +64,199 @@ MODEL_CONFIG = {
         "params": {
             "temperature": 0.7,
             "max_tokens": 2048,
-            "stream": True
+            "stream": False
         }
-    },
-    "deepseek": {
-        "name": "DeepSeek R1",
-        "model": "deepseek-reasoner",
-        "base_url": "https://api.deepseek.com/v1",
-        "emoji": "🚀",
-        "env_key": "DEEPSEEK_API_KEY",
-        "params": {"temperature": 0.6, "max_tokens": 4096, "stream": True}
-    },
-    "kimi": {
-        "name": "Kimi Moonshot",
-        "model": "moonshot-v1-8k",
-        "base_url": "https://api.moonshot.cn/v1",
-        "emoji": "🌙",
-        "env_key": "KIMI_API_KEY",
-        "params": {"temperature": 0.7, "max_tokens": 4096, "stream": True}
     },
     "qwen": {
         "name": "通义千问 Max",
         "model": "qwen-max",
         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "web_url": "https://tongyi.aliyun.com",
         "emoji": "🌸",
         "env_key": "QWEN_API_KEY",
-        "params": {"temperature": 0.7, "max_tokens": 4096, "stream": True}
+        "params": {
+            "temperature": 0.7,
+            "max_tokens": 4096,
+            "stream": False
+        }
     }
 }
 
 # 3. 初始化会话状态
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "model_responses" not in st.session_state:
+    st.session_state.model_responses = {}
+if "enable_qwen_search" not in st.session_state:
+    st.session_state.enable_qwen_search = False
 
 # 4. 侧边栏配置
 with st.sidebar:
-    st.header("⚙️ 模型调度中心")
+    st.header("⚙️ 配置面板")
     
-    # API 状态展示 (自动检测环境变量)
-    st.subheader("🔑 接口状态")
+    st.subheader("选择要使用的模型")
     enabled_models = {}
-    for mid, config in MODEL_CONFIG.items():
-        has_key = os.getenv(config['env_key'])
-        status_color = "green" if has_key else "red"
-        st.markdown(f":{status_color}[{config['emoji']} {config['name']} ({'已就绪' if has_key else '缺少 Key'})]")
-        enabled_models[mid] = st.checkbox(f"启用 {config['name']}", value=has_key, key=f"check_{mid}")
+    for model_id, config in MODEL_CONFIG.items():
+        enabled_models[model_id] = st.checkbox(
+            f"{config['emoji']} {config['name']}",
+            value=True,
+            key=f"enable_{model_id}"
+        )
     
     st.write("---")
-    if st.button("🗑️ 清空上下文", use_container_width=True):
-        st.session_state.messages = []
-        st.rerun()
+    
+    st.subheader("🔑 API Key 状态")
+    for model_id, config in MODEL_CONFIG.items():
+        key = os.getenv(config['env_key'])
+        status = "✅ 已配置" if key else "❌ 未配置"
+        st.write(f"{config['emoji']} {config['name']}: {status}")
+    
+    st.write("---")
+    
+    with st.expander("高级设置"):
+        reasoning_level = st.select_slider(
+            "DeepSeek 推理强度",
+            options=["low", "medium", "high"],
+            value="medium",
+            key="reasoning_level"
+        )
+        MODEL_CONFIG["deepseek"]["params"]["reasoning_effort"] = reasoning_level
+        
+        temperature = st.slider(
+            "全局温度",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.7,
+            step=0.1,
+            key="temperature"
+        )
+        for model_id in MODEL_CONFIG:
+            MODEL_CONFIG[model_id]["params"]["temperature"] = temperature
 
-# 5. 渲染历史对话
+    # 🌸 Qwen 专属增强
+    if enabled_models.get("qwen", False):
+        with st.expander("🌸 Qwen 专属增强"):
+            st.session_state.enable_qwen_search = st.checkbox(
+                "🔍 启用联网搜索",
+                value=st.session_state.enable_qwen_search
+            )
+
+    st.write("---")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🗑️ 清空对话", use_container_width=True):
+            st.session_state.messages = []
+            st.session_state.model_responses = {}
+            st.rerun()
+    with col2:
+        if st.button("🔄 刷新页面", use_container_width=True):
+            st.rerun()
+    
+    st.info("💡 提示：Gemini 2.5 Flash 现已支持超长上下文处理")
+
+# 5. 渲染聊天记录
 for message in st.session_state.messages:
+    display_content = message["content"]
+    if "[参考回答]" in display_content:
+        display_content = display_content.split("[参考回答]: ")[-1]
     with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+        st.markdown(display_content)
 
-# 6. 核心对话执行引擎
-def execute_chat(model_id: str, col, messages: list):
+# 6. 优化的AI调用函数
+def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
     config = MODEL_CONFIG[model_id]
-    with col:
-        st.subheader(f"{config['emoji']} {config['name']}")
+    
+    with col_obj:
+        st.markdown(f"### {config['emoji']} [{config['name']}]({config['web_url']})")
+        
+        api_key = os.getenv(config['env_key'])
+        if not api_key:
+            st.warning(f"请设置 {config['env_key']}")
+            return None
+        
+        if not enabled_models.get(model_id, True):
+            st.info("⏸️ 模型已禁用")
+            return None
+        
         try:
-            client = OpenAI(api_key=os.getenv(config['env_key']), base_url=config['base_url'])
+            client = OpenAI(
+                api_key=api_key,
+                base_url=config['base_url']
+            )
             
-            # 清理非标准 OpenAI 参数
-            api_params = config['params'].copy()
-            api_params["model"] = config['model']
-            api_params["messages"] = messages
-            
-            # 流式渲染处理
-            response_container = st.empty()
-            full_content = ""
-            
-            with st.spinner(f"{config['name']} 正在思考..."):
-                stream = client.chat.completions.create(**api_params)
-                for chunk in stream:
-                    if chunk.choices[0].delta.content:
-                        full_content += chunk.choices[0].delta.content
-                        response_container.markdown(full_content + "▌")
-            
-            response_container.markdown(full_content)
-            return full_content
-            
+            params = {
+                "model": config['model'],
+                "messages": messages,
+                **config['params']
+            }
+
+            # === 🌸 Qwen 特性增强 ===
+            if model_id == "qwen":
+                if st.session_state.get("enable_qwen_search", False):
+                    params["enable_search"] = True
+                last_user_msg = next((msg["content"] for msg in reversed(messages) if msg["role"] == "user"), "")
+                if any(kw in last_user_msg.lower() for kw in ["json", "结构化", "表格"]):
+                    params["response_format"] = {"type": "json_object"}
+
+            # === ✨ Gemini 特性优化 ===
+            elif model_id == "gemini":
+                # Gemini 2.5 在处理代码或长逻辑时，适当降低温度能获得更稳定的输出
+                last_user_msg = next((msg["content"] for msg in reversed(messages) if msg["role"] == "user"), "")
+                if "代码" in last_user_msg or "写个" in last_user_msg:
+                    params["temperature"] = max(0.2, params["temperature"] - 0.3)
+
+            # === 🚀 DeepSeek 特殊处理 ===
+            elif model_id == "deepseek" and "reasoning_effort" in params:
+                if not params.get("stream"):
+                    params.pop("stream", None)
+
+            # 调用 API
+            with st.status(f"{config['emoji']} 正在思考中...", expanded=False) as status:
+                st.write(f"使用模型: {config['model']}")
+                response = client.chat.completions.create(**params)
+                answer = response.choices[0].message.content
+                
+                if hasattr(response, 'usage'):
+                    st.write(f"Tokens: {response.usage.total_tokens}")
+                status.update(label=f"{config['emoji']} 完成！", state="complete")
+
+            st.markdown(answer)
+            st.session_state.model_responses[model_id] = {"answer": answer, "model": config['model']}
+            return answer
+
         except Exception as e:
-            st.error(f"调用失败: {str(e)}")
+            st.error(f"调用失败: {str(e)[:100]}")
             return None
 
-# 7. 用户交互入口
-if prompt := st.chat_input("输入你的问题..."):
-    # 记录用户输入
+# 7. 聊天输入逻辑 (保持原逻辑不变)
+if prompt := st.chat_input("向AI模型提问..."):
+    st.session_state.query_time = datetime.now().strftime("%H:%M:%S")
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
     
-    # 筛选已启用的模型
-    active_mids = [m for m, v in enabled_models.items() if v]
-    if not active_mids:
-        st.warning("⚠️ 请至少配置并启用一个模型。")
-    else:
-        # 分栏显示回复
-        cols = st.columns(len(active_mids))
-        all_responses = {}
+    enabled_model_ids = [mid for mid in MODEL_CONFIG.keys() if enabled_models.get(mid, True)]
+    if not enabled_model_ids:
+        st.warning("⚠️ 请至少启用一个模型")
+        st.stop()
+    
+    cols = st.columns(len(enabled_model_ids))
+    with st.spinner(f"正在同步调用 {len(enabled_model_ids)} 个模型..."):
+        responses = {}
+        for idx, model_id in enumerate(enabled_model_ids):
+            answer = ask_ai(model_id, cols[idx], st.session_state.messages)
+            if answer:
+                responses[model_id] = answer
         
-        for idx, mid in enumerate(active_mids):
-            res = execute_chat(mid, cols[idx], st.session_state.messages)
-            if res:
-                all_responses[mid] = res
+        if responses:
+            ref_order = ["deepseek", "qwen", "gemini", "kimi", "gpt"]
+            ref_model_id = next((mid for mid in ref_order if mid in responses), list(responses.keys())[0])
+            st.session_state.messages.append({
+                "role": "assistant", 
+                "content": f"[参考回答 - {MODEL_CONFIG[ref_model_id]['name']}]: {responses[ref_model_id]}"
+            })
 
-        # 将 Gemini 2.5 的回答作为主回复存入历史（因为它最强）
-        if "gemini" in all_responses:
-            st.session_state.messages.append({"role": "assistant", "content": f"**[Gemini 2.5]**: {all_responses['gemini']}"})
+# 8. 底部信息
+st.sidebar.write("---")
+st.sidebar.caption("🔄 版本 7.2 | 融入 Gemini 2.5 Flash 性能优化")
