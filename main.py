@@ -231,7 +231,7 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                 base_url=config['base_url']
             )
             
-      # ========== Kimi K2.5 参数配置 ==========
+            # ========== Kimi K2.5 参数配置 ==========
             if model_id == "kimi" and st.session_state.get("kimi_k25_enabled", True):
                 params = {
                     "model": "kimi-k2.5",
@@ -240,22 +240,22 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                     "stream": st.session_state.get("kimi_streaming_enabled", True),
                     "top_p": 0.95
                 }
-             
+                st.caption("🌙 Kimi K2.5 | 温度: 1 (固定) | 32k 输出")
 
                 if params["stream"]:
                     return _stream_kimi_response(client, params, messages)
                 else:
-                    # ✅ 使用和其他模型完全相同的 st.status 结构
+                    # 非流式：和其他模型完全一致
                     with st.status("🌙 Kimi 思考中...", expanded=False) as status:
                         st.write("使用模型: kimi-k2.5")
                         response = client.chat.completions.create(**params)
                         answer = response.choices[0].message.content
                         
-                        if hasattr(response, 'usage'):
+                        if hasattr(response, 'usage') and response.usage is not None:
                             st.write(f"Tokens: {response.usage.total_tokens}")
                         status.update(label="✅ 完成！", state="complete")
                     
-                    st.markdown(answer)  # ← 在 status 外部
+                    st.markdown(answer)
                     st.session_state.model_responses[model_id] = {
                         "answer": answer, 
                         "model": "kimi-k2.5",
@@ -292,7 +292,7 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                 response = client.chat.completions.create(**params)
                 answer = response.choices[0].message.content
                 
-                if hasattr(response, 'usage'):
+                if hasattr(response, 'usage') and response.usage is not None:
                     st.write(f"Tokens: {response.usage.total_tokens}")
                 status.update(label=f"{config['emoji']} 完成！", state="complete")
 
@@ -337,6 +337,9 @@ def _stream_kimi_response(client, params, messages) -> Optional[str]:
             response_placeholder.markdown(full_response)
             status.update(label="✅ 完成！", state="complete")
         
+        # ✅ 关键修复：在 st.status 外部再输出一次回答，确保和其他模型一致
+        st.markdown(full_response)
+        
         st.session_state.model_responses["kimi"] = {
             "answer": full_response,
             "model": "kimi-k2.5",
@@ -349,7 +352,6 @@ def _stream_kimi_response(client, params, messages) -> Optional[str]:
     except Exception as e:
         error_msg = str(e)
         st.error(f"Kimi 流式输出失败: {error_msg[:200]}")
-        # 打印完整错误以便调试
         print(f"Kimi Error Details: {error_msg}")
         print(f"Params sent: {params}")
         return None
