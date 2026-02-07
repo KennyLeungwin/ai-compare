@@ -2,9 +2,9 @@ import streamlit as st
 import os
 from openai import OpenAI
 
-# 1. 页面配置：5 模型需要极宽的布局
-st.set_page_config(page_title="五模型 AI 对话助手", layout="wide")
-st.title("🧠 五模型聊天对比 (V5.0 终极阵营)")
+# 1. 页面配置
+st.set_page_config(page_title="多模型对比导航版", layout="wide")
+st.title("🧠 五模型对比聊天 (官方对话框直达版)")
 
 # 2. 初始化对话历史
 if "messages" not in st.session_state:
@@ -17,7 +17,7 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
     st.write("---")
-    st.info("当前阵营：DeepSeek, Gemini, Kimi, GPT-3.5, Qwen")
+    st.info("💡 提示：点击模型名称可直接跳转到官方网页版对话框进行原生对话。")
 
 # 4. 渲染聊天记录
 for message in st.session_state.messages:
@@ -36,10 +36,11 @@ if prompt := st.chat_input("向 5 个 AI 同时发起提问..."):
     # 6. 创建 5 列布局
     cols = st.columns(5)
     
-    # 定义通用调用函数
-    def ask_ai(api_key, base_url, model_name, col_obj, name):
+    # 核心调用函数：带官方对话框链接
+    def ask_ai(api_key, base_url, model_name, col_obj, display_name, web_url):
         with col_obj:
-            st.subheader(name)
+            # 渲染带链接的标题，点击即跳转
+            st.markdown(f"### [{display_name}]({web_url})")
             if not api_key:
                 st.warning("未配置 Key")
                 return None
@@ -58,22 +59,57 @@ if prompt := st.chat_input("向 5 个 AI 同时发起提问..."):
                 return None
 
     with st.spinner("5 大 AI 正在同步思考并调取记忆..."):
-        # --- 1. DeepSeek (需 1 元余额) ---
-        ans_ds = ask_ai(os.getenv("DEEPSEEK_API_KEY"), "https://api.deepseek.com/v1", "deepseek-chat", cols[0], "🤖 DeepSeek")
+        # --- 1. DeepSeek 官方对话链接 ---
+        ans_ds = ask_ai(
+            os.getenv("DEEPSEEK_API_KEY"), 
+            "https://api.deepseek.com/v1", 
+            "deepseek-chat", 
+            cols[0], 
+            "🤖 DeepSeek", 
+            "https://chat.deepseek.com/"
+        )
         
-        # --- 2. Gemini (保留位置，使用更严谨的路径) ---
-        ans_gemini = ask_ai(os.getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/openai", "gemini-1.5-flash", cols[1], "✨ Gemini")
+        # --- 2. Gemini 官方对话链接 ---
+        ans_gemini = ask_ai(
+            os.getenv("GEMINI_API_KEY"), 
+            "https://generativelanguage.googleapis.com/v1beta/openai", 
+            "gemini-1.5-flash", 
+            cols[1], 
+            "✨ Gemini", 
+            "https://gemini.google.com/"
+        )
         
-        # --- 3. Kimi (Moonshot - 新加入) ---
-        ans_kimi = ask_ai(os.getenv("KIMI_API_KEY"), "https://api.moonshot.cn/v1", "moonshot-v1-8k", cols[2], "🌙 Kimi")
+        # --- 3. Kimi 官方对话链接 ---
+        ans_kimi = ask_ai(
+            os.getenv("KIMI_API_KEY"), 
+            "https://api.moonshot.cn/v1", 
+            "moonshot-v1-8k", 
+            cols[2], 
+            "🌙 Kimi", 
+            "https://kimi.moonshot.cn/"
+        )
         
-        # --- 4. GPT-3.5 (OpenRouter) ---
-        ans_gpt = ask_ai(os.getenv("OPENROUTER_API_KEY"), "https://openrouter.ai/api/v1", "openai/gpt-3.5-turbo", cols[3], "💬 GPT-3.5")
+        # --- 4. GPT-3.5 (ChatGPT) 官方对话链接 ---
+        ans_gpt = ask_ai(
+            os.getenv("OPENROUTER_API_KEY"), 
+            "https://openrouter.ai/api/v1", 
+            "openai/gpt-3.5-turbo", 
+            cols[3], 
+            "💬 GPT-3.5", 
+            "https://chatgpt.com/"
+        )
         
-        # --- 5. 通义千问 (阿里云) ---
-        ans_qwen = ask_ai(os.getenv("QWEN_API_KEY"), "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-max", cols[4], "🌸 通义千问")
+        # --- 5. 通义千问 官方对话链接 ---
+        ans_qwen = ask_ai(
+            os.getenv("QWEN_API_KEY"), 
+            "https://dashscope.aliyuncs.com/compatible-mode/v1", 
+            "qwen-max", 
+            cols[4], 
+            "🌸 通义千问", 
+            "https://tongyi.aliyun.com/"
+        )
 
-    # 7. 记忆同步：选取一个回答存入历史（优先 Kimi 或 Qwen）
+    # 7. 记忆保存
     ref_ans = ans_kimi if ans_kimi else ans_qwen
     if ref_ans:
         st.session_state.messages.append({"role": "assistant", "content": f"[参考回答]: {ref_ans}"})
