@@ -69,17 +69,54 @@ if prompt := st.chat_input("向 5 个 AI 同时发起提问..."):
             "https://chat.deepseek.com/"
         )
         
-    # --- 2. Gemini (终极排错版) ---
-        # 尝试使用 v1 稳定版路径，并手动去除 Key 可能存在的空格
-        gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
-        ans_gemini = ask_ai(
-            gemini_key, 
-            "https://generativelanguage.googleapis.com/v1/openai/", # 改用 v1 路径，并保留末尾斜杠
-            "gemini-1.5-flash", # 不加 -latest，直接指向标准名
-            cols[1], 
-            "✨ Gemini", 
-            "https://gemini.google.com/"
-        )
+# --- 2. Gemini (终极全维度诊断版) ---
+        with cols[1]:
+            st.subheader("✨ Gemini 诊断")
+            gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+            
+            if not gemini_key:
+                st.warning("未配置 Key")
+                ans_gemini = None
+            else:
+                # 定义诊断矩阵：尝试不同的 (接口路径, 模型格式) 组合
+                test_matrix = [
+                    {"url": "https://generativelanguage.googleapis.com/v1beta/openai/", "model": "gemini-1.5-flash", "note": "v1beta + 标准名"},
+                    {"url": "https://generativelanguage.googleapis.com/v1beta/openai/", "model": "models/gemini-1.5-flash", "note": "v1beta + 路径名"},
+                    {"url": "https://generativelanguage.googleapis.com/v1/openai/", "model": "gemini-1.5-flash", "note": "v1 + 标准名"},
+                    {"url": "https://generativelanguage.googleapis.com/v1/openai/", "model": "models/gemini-1.5-flash", "note": "v1 + 路径名"}
+                ]
+                
+                success = False
+                ans_gemini = None
+
+                # 开始矩阵轮询
+                for i, test in enumerate(test_matrix):
+                    # 在界面上显示当前正在测试哪种组合
+                    with st.expander(f"🔍 测试方案 {i+1}: {test['note']}", expanded=(not success)):
+                        try:
+                            client = OpenAI(api_key=gemini_key, base_url=test['url'])
+                            r = client.chat.completions.create(
+                                model=test['model'],
+                                messages=st.session_state.messages,
+                                timeout=15
+                            )
+                            ans_gemini = r.choices[0].message.content
+                            st.success(f"✅ 成功! 方案 {i+1} 有效")
+                            st.write(ans_gemini)
+                            success = True
+                            # 如果成功了，就在这个 expander 里显示结果，并停止后续测试
+                        except Exception as e:
+                            # 记录详细错误，方便我们分析
+                            err_msg = str(e)
+                            st.write(f"❌ 失败原因: `{err_msg[:100]}`")
+                    
+                    if success:
+                        break # 找到可行方案，退出循环
+
+                if not success:
+                    st.error("❌ 所有方案均失效。")
+                    # 如果全部失败，提供一个直接跳转的链接
+                    st.markdown(f"[去网页版直接聊](https://gemini.google.com/)")
         
         # --- 3. Kimi 官方对话链接 ---
         ans_kimi = ask_ai(
