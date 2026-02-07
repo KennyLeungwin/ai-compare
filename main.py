@@ -231,34 +231,22 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                 base_url=config['base_url']
             )
             
-            # ========== 关键修改：Kimi K2.5 完全独立的参数构建 ==========
+           # ========== Kimi K2.5 参数配置（不处理渲染） ==========
             if model_id == "kimi" and st.session_state.get("kimi_k25_enabled", True):
-                # 完全独立构建参数，不继承 MODEL_CONFIG 的任何参数
+                # 仅配置参数，后续走统一渲染流程
                 params = {
                     "model": "kimi-k2.5",
                     "messages": messages,
                     "max_tokens": 32768,
                     "stream": st.session_state.get("kimi_streaming_enabled", True),
                     "top_p": 0.95
-                    # 注意：绝对不包含 temperature 参数
                 }
+            
                 
-                st.caption("🌙 Kimi K2.5 | 温度: 1 (固定) | 32k 输出")
-                
+                # 如果启用流式，走专用流式函数
                 if params["stream"]:
                     return _stream_kimi_response(client, params, messages)
-                else:
-                    with st.status("🌙 Kimi 思考中...", expanded=False) as status:
-                        response = client.chat.completions.create(**params)
-                        answer = response.choices[0].message.content
-                        status.update(label="✅ 完成！", state="complete")
-                    st.markdown(answer)
-                    st.session_state.model_responses[model_id] = {
-                        "answer": answer, 
-                        "model": "kimi-k2.5",
-                        "temperature": 1
-                    }
-                    return answer
+                # 否则，继续走下方统一的非流式渲染逻辑（和其他模型一致）
             
             # 其他模型使用原有逻辑
             params = {
