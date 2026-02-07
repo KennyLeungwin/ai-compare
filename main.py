@@ -61,15 +61,8 @@ if prompt := st.chat_input("向 5 个 AI 同时发起提问..."):
         # --- 1. DeepSeek ---
         ans_ds = ask_ai(os.getenv("DEEPSEEK_API_KEY"), "https://api.deepseek.com/v1", "deepseek-chat", cols[0], "🤖 DeepSeek", "https://chat.deepseek.com/")
         
-# --- 2. Gemini (换成配额更足的 1.5 版本) ---
-        ans_gemini = ask_ai(
-            os.getenv("GEMINI_API_KEY"), 
-            "https://generativelanguage.googleapis.com/v1beta/openai/", 
-            "gemini-1.5-flash", # 这里从 2.0 改回 1.5
-            cols[1], 
-            "✨ Gemini", 
-            "https://gemini.google.com/"
-        )
+        # --- 2. Gemini (使用探测成功的 2.0 模型) ---
+        ans_gemini = ask_ai(os.getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/openai/", "gemini-2.0-flash", cols[1], "✨ Gemini", "https://gemini.google.com/")
         
         # --- 3. Kimi ---
         ans_kimi = ask_ai(os.getenv("KIMI_API_KEY"), "https://api.moonshot.cn/v1", "moonshot-v1-8k", cols[2], "🌙 Kimi", "https://kimi.moonshot.cn/")
