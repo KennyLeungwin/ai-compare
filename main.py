@@ -62,8 +62,14 @@ if prompt := st.chat_input("向 AI 发起提问..."):
         # 1. DeepSeek
         ans_ds = ask_ai(os.getenv("DEEPSEEK_API_KEY"), "https://api.deepseek.com/v1", "deepseek-chat", cols[0], "🤖 DeepSeek")
         
-        # 2. Gemini (新加入的 Google 免费接口)
-        ans_gemini = ask_ai(os.getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/openai/", "gemini-1.5-flash", cols[1], "✨ Gemini")
+        # 2. Gemini (尝试使用最稳健的 v1beta 路径)
+        ans_gemini = ask_ai(
+            os.getenv("GEMINI_API_KEY"), 
+            "https://generativelanguage.googleapis.com/v1beta/openai", 
+            "gemini-1.5-flash-latest", 
+            cols[1], 
+            "✨ Gemini"
+        )
         
         # 3. GPT-3.5 (OpenRouter - 没钱会报错)
         ans_gpt = ask_ai(os.getenv("OPENROUTER_API_KEY"), "https://openrouter.ai/api/v1", "openai/gpt-3.5-turbo", cols[2], "💬 GPT-3.5")
