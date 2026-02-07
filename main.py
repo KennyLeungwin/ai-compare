@@ -239,7 +239,7 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                     "stream": False,
                     "temperature": 1.0
                 }
-                st.caption("🌙 Kimi K2.5 | 温度: 1 (固定) | 32k 输出")
+            
                 
                 with st.status("🌙 Kimi 思考中...", expanded=False) as status:
                     st.write("使用模型: kimi-k2.5")
