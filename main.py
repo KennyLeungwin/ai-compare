@@ -82,7 +82,7 @@ MODEL_CONFIG = {
     },
     "mistral": {
         "name": "Mistral AI (Mixtral-8x22B)",
-        "model": "mixtral-8x7b",
+        "model": "mistral-large-latest",
         "base_url": "https://api.mistral.ai/v1",
         "web_url": "https://mistral.ai",
         "emoji": "🦉",
@@ -285,28 +285,41 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                 return answer
             
             # ========== Mistral AI ==========
-            elif model_id == "mistral":
+               elif model_id == "mistral":
                 params = {
                     "model": config["model"],
                     "messages": messages,
                     "temperature": config["params"]["temperature"],
                     "max_tokens": config["params"]["max_tokens"],
-                    "stream": False,
-                   # "safe_prompt": config["params"]["safe_prompt"]
+                    "stream": False
                 }
-                
+            
+                # 动态调整温度（根据问题类型）
+                last_user_msg = next((msg["content"] for msg in reversed(messages) if msg["role"] == "user"), "")
+                if "代码" in last_user_msg or "program" in last_user_msg.lower():
+                    params["temperature"] = 0.3  # 代码问题降低随机性
+                elif "创意" in last_user_msg or "story" in last_user_msg.lower():
+                    params["temperature"] = 0.9  # 创意写作提高随机性
+            
                 with st.status("🦉 Mistral 正在思考中...", expanded=False) as status:
                     st.write(f"使用模型: {config['model']}")
-                    response = client.chat.completions.create(**params)
-                    answer = response.choices[0].message.content
-                    
-                    if hasattr(response, 'usage') and response.usage is not None:
-                        st.write(f"Tokens: {response.usage.total_tokens}")
-                    status.update(label="✅ 完成！", state="complete")
-                
-                st.markdown(answer)
-                st.session_state.model_responses[model_id] = {"answer": answer, "model": config["model"]}
-                return answer
+                    try:
+                        response = client.chat.completions.create(**params)
+                        answer = response.choices[0].message.content
+            
+                        if hasattr(response, 'usage') and response.usage is not None:
+                            st.write(f"Tokens: {response.usage.total_tokens}")
+                        status.update(label="✅ 完成！", state="complete")
+            
+                        st.markdown(answer)
+                        st.session_state.model_responses[model_id] = {
+                            "answer": answer,
+                            "model": config["model"]
+                        }
+                        return answer
+                    except Exception as e:
+                        st.error(f"Mistral 调用失败: {str(e)[:200]}")
+                        return None
             
             # ========== 其他模型（DeepSeek / Gemini / GPT / Qwen）==========
             else:
