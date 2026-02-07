@@ -82,20 +82,9 @@ MODEL_CONFIG = {
     }
 }
 
-# ========== 新增：Kimi K2.5 优化配置 ==========
-# 注意：K2.5 强制 temperature=1，不允许修改
-KIMI_K25_CONFIG = {
-    "model": "kimi-k2.5",
-    "base_url": "https://api.moonshot.cn/v1",
-    "max_tokens": 32768,
-    "stream": True,
-    "top_p": 0.95,
-    # 不设置 temperature，使用模型默认值 1
-}
-
 # 新增：Kimi 增强功能配置
 if "kimi_k25_enabled" not in st.session_state:
-    st.session_state.kimi_k25_enabled = True  # 默认启用 K2.5
+    st.session_state.kimi_k25_enabled = True
 if "kimi_streaming_enabled" not in st.session_state:
     st.session_state.kimi_streaming_enabled = True
 if "kimi_thinking_mode" not in st.session_state:
@@ -153,7 +142,6 @@ with st.sidebar:
         for model_id in MODEL_CONFIG:
             MODEL_CONFIG[model_id]["params"]["temperature"] = temperature
         
-        # ========== 修改：Kimi 温度说明 ==========
         st.divider()
         st.caption("🌙 **Kimi K2.5 说明**")
         st.info("""
@@ -173,7 +161,6 @@ with st.sidebar:
                 value=st.session_state.enable_qwen_search
             )
 
-    # ========== 修改：Kimi 专属配置 ==========
     if enabled_models.get("kimi", False):
         with st.expander("🌙 Kimi 专属增强", expanded=True):
             st.session_state.kimi_k25_enabled = st.toggle(
@@ -244,6 +231,36 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                 base_url=config['base_url']
             )
             
+            # ========== 关键修改：Kimi K2.5 完全独立的参数构建 ==========
+            if model_id == "kimi" and st.session_state.get("kimi_k25_enabled", True):
+                # 完全独立构建参数，不继承 MODEL_CONFIG 的任何参数
+                params = {
+                    "model": "kimi-k2.5",
+                    "messages": messages,
+                    "max_tokens": 32768,
+                    "stream": st.session_state.get("kimi_streaming_enabled", True),
+                    "top_p": 0.95
+                    # 注意：绝对不包含 temperature 参数
+                }
+                
+                st.caption("🌙 Kimi K2.5 | 温度: 1 (固定) | 32k 输出")
+                
+                if params["stream"]:
+                    return _stream_kimi_response(client, params, messages)
+                else:
+                    with st.status("🌙 Kimi 思考中...", expanded=False) as status:
+                        response = client.chat.completions.create(**params)
+                        answer = response.choices[0].message.content
+                        status.update(label="✅ 完成！", state="complete")
+                    st.markdown(answer)
+                    st.session_state.model_responses[model_id] = {
+                        "answer": answer, 
+                        "model": "kimi-k2.5",
+                        "temperature": 1
+                    }
+                    return answer
+            
+            # 其他模型使用原有逻辑
             params = {
                 "model": config['model'],
                 "messages": messages,
@@ -266,35 +283,7 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                 if not params.get("stream"):
                     params.pop("stream", None)
 
-            # ========== 修改：Kimi K2.5 优化处理 ==========
-            elif model_id == "kimi":
-                if st.session_state.get("kimi_k25_enabled", True):
-                    # 使用 K2.5 配置，不传递 temperature
-                    params["model"] = KIMI_K25_CONFIG["model"]
-                    params["max_tokens"] = KIMI_K25_CONFIG["max_tokens"]
-                    params["stream"] = st.session_state.get("kimi_streaming_enabled", True)
-                    params["top_p"] = KIMI_K25_CONFIG["top_p"]
-                    # 注意：不设置 params["temperature"]，使用模型默认值 1
-                    
-                    st.caption("🌙 Kimi K2.5 | 温度: 1 (固定) | 32k 输出")
-                    
-                    if params["stream"]:
-                        return _stream_kimi_response(client, params, messages)
-                    else:
-                        # 非流式调用
-                        with st.status("🌙 Kimi 思考中...", expanded=False) as status:
-                            response = client.chat.completions.create(**params)
-                            answer = response.choices[0].message.content
-                            status.update(label="✅ 完成！", state="complete")
-                        st.markdown(answer)
-                        st.session_state.model_responses[model_id] = {
-                            "answer": answer, 
-                            "model": params["model"],
-                            "temperature": 1
-                        }
-                        return answer
-
-            # 调用 API（其他模型或非增强 Kimi）
+            # 调用 API（其他模型）
             with st.status(f"{config['emoji']} 正在思考中...", expanded=False) as status:
                 st.write(f"使用模型: {config['model']}")
                 response = client.chat.completions.create(**params)
@@ -309,10 +298,10 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
             return answer
 
         except Exception as e:
-            st.error(f"调用失败: {str(e)[:100]}")
+            st.error(f"调用失败: {str(e)[:200]}")
             return None
 
-# ========== 修改：Kimi 流式响应处理 ==========
+# ========== Kimi 流式响应处理 ==========
 def _stream_kimi_response(client, params, messages) -> Optional[str]:
     """处理 Kimi K2.5 的流式输出"""
     full_response = ""
@@ -347,15 +336,19 @@ def _stream_kimi_response(client, params, messages) -> Optional[str]:
         
         st.session_state.model_responses["kimi"] = {
             "answer": full_response,
-            "model": params["model"],
-            "temperature": 1,  # K2.5 固定为 1
+            "model": "kimi-k2.5",
+            "temperature": 1,
             "reasoning": reasoning_content if reasoning_content else None
         }
         
         return full_response
         
     except Exception as e:
-        st.error(f"Kimi 流式输出失败: {str(e)[:150]}")
+        error_msg = str(e)
+        st.error(f"Kimi 流式输出失败: {error_msg[:200]}")
+        # 打印完整错误以便调试
+        print(f"Kimi Error Details: {error_msg}")
+        print(f"Params sent: {params}")
         return None
 
 # 7. 聊天输入逻辑
