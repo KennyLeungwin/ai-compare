@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 from openai import OpenAI
-from typing import Optional, Dict, Any
+from typing import Optional
 from datetime import datetime
 
 # 1. 页面配置
@@ -10,7 +10,7 @@ st.set_page_config(
     layout="wide",
     page_icon="🤖"
 )
-st.title("🧠 六模型聊天对比 (V8.0 统一UI版)")
+st.title("🧠 六模型聊天对比 (V8.1 - 回答直接显示)")
 
 # 2. 模型配置信息（新增 Mistral）
 MODEL_CONFIG = {
@@ -82,7 +82,7 @@ MODEL_CONFIG = {
     },
     "mistral": {
         "name": "Mistral AI (Mixtral-8x22B)",
-        "model": "mistral-large-latest",
+        "model": "mistral-large-latest",  # 或 "mistralai/Mixtral-8x22B-Instruct-v0.1"
         "base_url": "https://api.mistral.ai/v1",
         "web_url": "https://mistral.ai",
         "emoji": "🦉",
@@ -95,14 +95,6 @@ MODEL_CONFIG = {
     }
 }
 
-# 初始化增强设置
-if "kimi_k25_enabled" not in st.session_state:
-    st.session_state.kimi_k25_enabled = True
-if "kimi_streaming_enabled" not in st.session_state:
-    st.session_state.kimi_streaming_enabled = True
-if "kimi_thinking_mode" not in st.session_state:
-    st.session_state.kimi_thinking_mode = False
-
 # 3. 初始化会话状态
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -110,6 +102,8 @@ if "model_responses" not in st.session_state:
     st.session_state.model_responses = {}
 if "enable_qwen_search" not in st.session_state:
     st.session_state.enable_qwen_search = False
+if "kimi_k25_enabled" not in st.session_state:
+    st.session_state.kimi_k25_enabled = True
 
 # 4. 侧边栏配置
 with st.sidebar:
@@ -124,7 +118,6 @@ with st.sidebar:
         )
 
     st.write("---")
-
     st.subheader("🔑 API Key 状态")
     for model_id, config in MODEL_CONFIG.items():
         key = os.getenv(config['env_key'])
@@ -151,7 +144,6 @@ with st.sidebar:
             key="global_temperature"
         )
 
-        # 全局温度设置（排除 Mistral 和 Kimi K2.5）
         for model_id in MODEL_CONFIG:
             if model_id != "mistral" and not (model_id == "kimi" and st.session_state.get("kimi_k25_enabled", False)):
                 MODEL_CONFIG[model_id]["params"]["temperature"] = temperature
@@ -160,49 +152,23 @@ with st.sidebar:
         st.caption("🌙 **Kimi K2.5 说明**")
         st.info("""
         Kimi K2.5 模型固定使用温度 = 1（不可调整）
-        该模型通过其他方式控制输出风格，不受全局温度影响
-
         已启用优化：
         • 32k 输出长度
-        • 流式传输
         • 256k 上下文
         """)
 
     if enabled_models.get("qwen", False):
         with st.expander("🌸 Qwen 专属增强"):
-            st.session_state.enable_qwen_search = st.checkbox(
-                "🔍 启用联网搜索",
-                value=st.session_state.enable_qwen_search
-            )
+            st.session_state.enable_qwen_search = st.checkbox("🔍 启用联网搜索", value=st.session_state.enable_qwen_search)
 
     if enabled_models.get("kimi", False):
         with st.expander("🌙 Kimi 专属增强", expanded=True):
-            st.session_state.kimi_k25_enabled = st.toggle(
-                "使用 Kimi K2.5（推荐）",
-                value=st.session_state.kimi_k25_enabled,
-                help="升级到最新模型，支持更长上下文和流式输出"
-            )
-
+            st.session_state.kimi_k25_enabled = st.toggle("使用 Kimi K2.5（推荐）", value=st.session_state.kimi_k25_enabled)
             if st.session_state.kimi_k25_enabled:
                 st.success("✅ Kimi K2.5 已启用")
-                st.caption("温度固定为 1 | 输出长度: 32k | 上下文: 256k")
-
-                st.session_state.kimi_streaming_enabled = st.toggle(
-                    "启用流式传输",
-                    value=st.session_state.kimi_streaming_enabled,
-                    help="实时显示生成内容，避免超时"
-                )
-
-                st.session_state.kimi_thinking_mode = st.toggle(
-                    "启用 Thinking 模式",
-                    value=st.session_state.kimi_thinking_mode,
-                    help="展示模型推理过程（如支持）"
-                )
-            else:
-                st.info("使用原版 Kimi，跟随全局温度设置")
+                st.caption("温度固定为 1 | 输出长度: 32k")
 
     st.write("---")
-
     col1, col2 = st.columns(2)
     with col1:
         if st.button("🗑️ 清空对话", use_container_width=True):
@@ -213,9 +179,7 @@ with st.sidebar:
         if st.button("🔄 刷新页面", use_container_width=True):
             st.rerun()
 
-    st.info("💡 提示：Gemini 2.5 Flash 现已支持超长上下文处理")
-
-# 5. 渲染聊天记录（保留顶部参考回答）
+# 5. 渲染历史消息
 for message in st.session_state.messages:
     display_content = message["content"]
     if "[参考回答]" in display_content:
@@ -223,28 +187,25 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(display_content)
 
-# 6. AI 调用函数（融合 Mistral）
+# 6. 核心函数：调用 AI 模型
 def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
     config = MODEL_CONFIG[model_id]
-
+    
     with col_obj:
         st.markdown(f"### {config['emoji']} [{config['name']}]({config['web_url']})")
-
+        
         api_key = os.getenv(config['env_key'])
         if not api_key:
             st.warning(f"请设置 {config['env_key']}")
             return None
-
+        
         if not enabled_models.get(model_id, True):
             st.info("⏸️ 模型已禁用")
             return None
-
+        
         try:
-            client = OpenAI(
-                api_key=api_key,
-                base_url=config['base_url']
-            )
-
+            client = OpenAI(api_key=api_key, base_url=config['base_url'])
+            
             # ========== Kimi K2.5 ==========
             if model_id == "kimi" and st.session_state.get("kimi_k25_enabled", True):
                 params = {
@@ -255,24 +216,24 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                     "temperature": 1.0
                 }
                 st.caption("🌙 Kimi K2.5 | 温度: 1 (固定) | 32k 输出")
-
-                with st.status("🌙 Kimi 思考中...", expanded=True) as status:
+                
+                with st.status("🌙 Kimi 思考中...", expanded=False) as status:
                     st.write("使用模型: kimi-k2.5")
                     response = client.chat.completions.create(**params)
                     answer = response.choices[0].message.content
-
+                    
                     if hasattr(response, 'usage') and response.usage is not None:
                         st.write(f"Tokens: {response.usage.total_tokens}")
-                    status.update(label="✅ 完成！", state="complete", expanded=True)
-
-                st.write(answer)
+                    status.update(label="✅ 完成！", state="complete")
+                
+                # ✅ 关键：直接显示回答
+                st.markdown(answer)
                 st.session_state.model_responses[model_id] = {
-                    "answer": answer,
-                    "model": "kimi-k2.5",
-                    "temperature": 1
+                    "answer": answer, 
+                    "model": "kimi-k2.5"
                 }
                 return answer
-
+            
             # ========== Mistral AI ==========
             elif model_id == "mistral":
                 params = {
@@ -283,34 +244,28 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                     "stream": False
                 }
 
-                # 动态调整温度（根据问题类型）
+                # 动态调整温度
                 last_user_msg = next((msg["content"] for msg in reversed(messages) if msg["role"] == "user"), "")
                 if "代码" in last_user_msg or "program" in last_user_msg.lower():
-                    params["temperature"] = 0.3  # 代码问题降低随机性
+                    params["temperature"] = 0.3
                 elif "创意" in last_user_msg or "story" in last_user_msg.lower():
-                    params["temperature"] = 0.9  # 创意写作提高随机性
+                    params["temperature"] = 0.9
 
-                with st.status("🦉 Mistral 正在思考中...", expanded=True) as status:
+                with st.status("🦉 Mistral 正在思考中...", expanded=False) as status:
                     st.write(f"使用模型: {config['model']}")
-                    try:
-                        response = client.chat.completions.create(**params)
-                        answer = response.choices[0].message.content
+                    response = client.chat.completions.create(**params)
+                    answer = response.choices[0].message.content
 
-                        if hasattr(response, 'usage') and response.usage is not None:
-                            st.write(f"Tokens: {response.usage.total_tokens}")
-                        status.update(label="✅ 完成！", state="complete", expanded=True)
+                    if hasattr(response, 'usage') and response.usage is not None:
+                        st.write(f"Tokens: {response.usage.total_tokens}")
+                    status.update(label="✅ 完成！", state="complete")
 
-                        st.write(answer)
-                        st.session_state.model_responses[model_id] = {
-                            "answer": answer,
-                            "model": config["model"]
-                        }
-                        return answer
-                    except Exception as e:
-                        st.error(f"Mistral 调用失败: {str(e)[:200]}")
-                        return None
+                # ✅ 关键：直接显示回答（不在 try 内部嵌套太深）
+                st.markdown(answer)
+                st.session_state.model_responses[model_id] = {"answer": answer, "model": config["model"]}
+                return answer
 
-            # ========== 其他模型（DeepSeek / Gemini / GPT / Qwen）==========
+            # ========== 其他模型 ==========
             else:
                 params = {
                     "model": config['model'],
@@ -334,36 +289,35 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                     if not params.get("stream"):
                         params.pop("stream", None)
 
-                # 调用 API
-                with st.status(f"{config['emoji']} 正在思考中...", expanded=True) as status:
+                with st.status(f"{config['emoji']} 正在思考中...", expanded=False) as status:
                     st.write(f"使用模型: {config['model']}")
                     response = client.chat.completions.create(**params)
                     answer = response.choices[0].message.content
 
                     if hasattr(response, 'usage') and response.usage is not None:
                         st.write(f"Tokens: {response.usage.total_tokens}")
-                    status.update(label=f"{config['emoji']} 完成！", state="complete", expanded=True)
+                    status.update(label=f"{config['emoji']} 完成！", state="complete")
 
-                st.write(answer)
+                # ✅ 统一在此处显示
+                st.markdown(answer)
                 st.session_state.model_responses[model_id] = {"answer": answer, "model": config['model']}
                 return answer
 
         except Exception as e:
-            st.error(f"调用失败: {str(e)[:200]}")
+            st.error(f"❌ {config['name']} 调用失败: {str(e)[:200]}")
             return None
 
-# 7. 聊天输入逻辑
+# 7. 用户输入处理
 if prompt := st.chat_input("向AI模型提问..."):
-    st.session_state.query_time = datetime.now().strftime("%H:%M:%S")
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
-
+    
     enabled_model_ids = [mid for mid in MODEL_CONFIG.keys() if enabled_models.get(mid, True)]
     if not enabled_model_ids:
         st.warning("⚠️ 请至少启用一个模型")
         st.stop()
-
+    
     cols = st.columns(len(enabled_model_ids))
     with st.spinner(f"正在同步调用 {len(enabled_model_ids)} 个模型..."):
         responses = {}
@@ -371,8 +325,8 @@ if prompt := st.chat_input("向AI模型提问..."):
             answer = ask_ai(model_id, cols[idx], st.session_state.messages)
             if answer:
                 responses[model_id] = answer
-
-        # 保留参考回答（可选）
+        
+        # 添加参考回答到聊天记录（用于后续上下文）
         if responses:
             ref_order = ["deepseek", "qwen", "gemini", "kimi", "mistral", "gpt"]
             ref_model_id = next((mid for mid in ref_order if mid in responses), list(responses.keys())[0])
@@ -383,4 +337,4 @@ if prompt := st.chat_input("向AI模型提问..."):
 
 # 8. 底部信息
 st.sidebar.write("---")
-st.sidebar.caption("🔄 版本 8.0 | 支持六模型并行对比 | Kimi 与 Mistral 已优化")
+st.sidebar.caption("🔄 版本 V8.1 | 所有模型回答直接显示 | Mistral & Kimi 已修复")
