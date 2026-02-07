@@ -231,32 +231,29 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                 base_url=config['base_url']
             )
             
-            # ========== Kimi K2.5 参数配置（不处理渲染） ==========
+                 # ========== Kimi K2.5 参数配置（不处理渲染） ==========
             if model_id == "kimi" and st.session_state.get("kimi_k25_enabled", True):
                 params = {
                     "model": "kimi-k2.5",
                     "messages": messages,
                     "max_tokens": 32768,
-                    "stream": st.session_state.get("kimi_streaming_enabled", True),
+                    "stream": False,  # ← 关键修改：强制关闭流式！
                     "top_p": 0.95
                 }
                 st.caption("🌙 Kimi K2.5 | 温度: 1 (固定) | 32k 输出")
 
-                if params["stream"]:
-                    return _stream_kimi_response(client, params, messages)
-                else:
-                    # ❌ 不再用 st.status，改用 st.spinner
-                    with st.spinner("🌙 Kimi 思考中..."):
-                        response = client.chat.completions.create(**params)
-                        answer = response.choices[0].message.content
-                    
-                    st.markdown(answer)
-                    st.session_state.model_responses[model_id] = {
-                        "answer": answer, 
-                        "model": "kimi-k2.5",
-                        "temperature": 1
-                    }
-                    return answer
+                # 跳过流式判断，直接走非流式
+                with st.spinner("🌙 Kimi 思考中..."):
+                    response = client.chat.completions.create(**params)
+                    answer = response.choices[0].message.content
+                
+                st.markdown(answer)
+                st.session_state.model_responses[model_id] = {
+                    "answer": answer, 
+                    "model": "kimi-k2.5",
+                    "temperature": 1
+                }
+                return answer
             
             # 其他模型使用原有逻辑
             params = {
