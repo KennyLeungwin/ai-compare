@@ -106,7 +106,7 @@ if prompt := st.chat_input("向 5 个 AI 同时发起提问..."):
             "qwen-max", 
             cols[4], 
             "🌸 通义千问", 
-            "https://tongyi.aliyun.com/"
+            "https://www.qianwen.com/"
         )
 
     # 7. 记忆保存
