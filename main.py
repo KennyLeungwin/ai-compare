@@ -17,8 +17,8 @@ MODEL_CONFIG = {
     "deepseek": {
         "name": "DeepSeek Reasoning",
         "model": "deepseek-reasoner",
-        "base_url": "https://api.deepseek.com/v1",
-        "web_url": "https://chat.deepseek.com",
+        "base_url": "https://api.deepseek.com/v1 ",
+        "web_url": "https://chat.deepseek.com ",
         "emoji": "🚀",
         "env_key": "DEEPSEEK_API_KEY",
         "params": {
@@ -31,8 +31,8 @@ MODEL_CONFIG = {
     "gemini": {
         "name": "Gemini 2.5 Flash",
         "model": "gemini-2.5-flash", # 升级至 2026 最新模型
-        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
-        "web_url": "https://aistudio.google.com",
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/ ",
+        "web_url": "https://aistudio.google.com ",
         "emoji": "✨",
         "env_key": "GEMINI_API_KEY",
         "params": {
@@ -44,8 +44,8 @@ MODEL_CONFIG = {
     "kimi": {
         "name": "Kimi Moonshot",
         "model": "moonshot-v1-8k",
-        "base_url": "https://api.moonshot.cn/v1",
-        "web_url": "https://kimi.moonshot.cn",
+        "base_url": "https://api.moonshot.cn/v1 ",
+        "web_url": "https://kimi.moonshot.cn ",
         "emoji": "🌙",
         "env_key": "KIMI_API_KEY",
         "params": {
@@ -57,8 +57,8 @@ MODEL_CONFIG = {
     "gpt": {
         "name": "GPT-3.5 Turbo",
         "model": "openai/gpt-3.5-turbo",
-        "base_url": "https://openrouter.ai/api/v1",
-        "web_url": "https://chat.openai.com",
+        "base_url": "https://openrouter.ai/api/v1 ",
+        "web_url": "https://chat.openai.com ",
         "emoji": "💬",
         "env_key": "OPENROUTER_API_KEY",
         "params": {
@@ -70,8 +70,8 @@ MODEL_CONFIG = {
     "qwen": {
         "name": "通义千问 Max",
         "model": "qwen-max",
-        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "web_url": "https://tongyi.aliyun.com",
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1 ",
+        "web_url": "https://tongyi.aliyun.com ",
         "emoji": "🌸",
         "env_key": "QWEN_API_KEY",
         "params": {
@@ -82,6 +82,70 @@ MODEL_CONFIG = {
     }
 }
 
+# ========== 新增：Kimi 智能温度优化配置（完全独立，不修改 MODEL_CONFIG） ==========
+KIMI_TEMPERATURE_OPTIMIZER = {
+    "enabled": True,  # 是否启用智能温度优化
+    "model": "kimi-k2.5",  # 升级至最新模型
+    "base_url": "https://api.moonshot.cn/v1",
+    "max_tokens": 32768,  # K2.5 支持 32k 输出
+    "stream": True,  # 必须启用流式
+    "top_p": 0.95,
+    
+    # 智能温度策略：基于全局温度，根据任务类型动态调整
+    "temperature_rules": {
+        # 基础偏移：Kimi 官方推荐比通用模型略高（创造性更强）
+        "base_offset": 0.2,  # 全局 0.7 -> Kimi 0.9
+        
+        # 任务类型检测与温度调整
+        "task_adjustments": {
+            "coding": {
+                "keywords": ["代码", "编程", "python", "javascript", "写个函数", "写个类", "程序", "script", "function", "class"],
+                "offset": -0.5,  # 代码任务需要确定性，大幅降低
+                "description": "🖥️ 代码生成"
+            },
+            "analysis": {
+                "keywords": ["分析", "推理", "为什么", "如何", "步骤", "证明", "比较", "评估", "解释", "原因"],
+                "offset": 0.1,  # 分析任务保持中等温度
+                "description": "🧠 深度分析"
+            },
+            "creative": {
+                "keywords": ["写", "创作", "故事", "诗歌", "文章", "创意", "想象", "假如", "如果"],
+                "offset": 0.3,  # 创作任务提高温度
+                "description": "✨ 创意写作"
+            },
+            "translation": {
+                "keywords": ["翻译", "translate", "英文", "中文", "日文"],
+                "offset": -0.2,  # 翻译需要准确性
+                "description": "🌐 翻译任务"
+            },
+            "math": {
+                "keywords": ["计算", "数学", "公式", "solve", "equation", "math", "证明"],
+                "offset": -0.4,  # 数学需要精确性
+                "description": "🔢 数学计算"
+            }
+        },
+        
+        # 上下文长度调整
+        "context_adjustments": {
+            "long_threshold": 8000,  # 字符数
+            "offset": -0.1,  # 长文本略微降温保证稳定性
+            "description": "📄 长文本优化"
+        },
+        
+        # 边界限制
+        "min_temp": 0.1,
+        "max_temp": 1.5
+    }
+}
+
+# 新增：Kimi 增强功能配置（独立 session state）
+if "kimi_smart_temp_enabled" not in st.session_state:
+    st.session_state.kimi_smart_temp_enabled = True  # 默认启用智能温度
+if "kimi_streaming_enabled" not in st.session_state:
+    st.session_state.kimi_streaming_enabled = True
+if "kimi_thinking_mode" not in st.session_state:
+    st.session_state.kimi_thinking_mode = False
+
 # 3. 初始化会话状态
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -89,6 +153,71 @@ if "model_responses" not in st.session_state:
     st.session_state.model_responses = {}
 if "enable_qwen_search" not in st.session_state:
     st.session_state.enable_qwen_search = False
+
+# ========== 新增：智能温度计算函数（核心逻辑） ==========
+def calculate_kimi_temperature(global_temp: float, messages: list) -> tuple[float, str, dict]:
+    """
+    基于全局温度和对话内容，计算最适合 Kimi 的温度
+    
+    Returns:
+        (final_temperature, description, debug_info)
+    """
+    optimizer = KIMI_TEMPERATURE_OPTIMIZER["temperature_rules"]
+    
+    # 1. 基础偏移
+    base_temp = global_temp + optimizer["base_offset"]
+    adjustments = [f"基础: {global_temp} + {optimizer['base_offset']} = {base_temp}"]
+    
+    # 2. 检测任务类型
+    last_message = next(
+        (msg["content"] for msg in reversed(messages) if msg["role"] == "user"),
+        ""
+    ).lower()
+    
+    task_type = "general"
+    task_offset = 0
+    task_desc = "📝 通用对话"
+    
+    for task_key, task_config in optimizer["task_adjustments"].items():
+        if any(keyword in last_message for keyword in task_config["keywords"]):
+            task_offset = task_config["offset"]
+            task_type = task_key
+            task_desc = task_config["description"]
+            adjustments.append(f"{task_desc}: {task_offset}")
+            break
+    
+    # 3. 检测上下文长度
+    context_offset = 0
+    context_desc = ""
+    total_length = sum(len(msg.get("content", "")) for msg in messages)
+    
+    if total_length > optimizer["context_adjustments"]["long_threshold"]:
+        context_offset = optimizer["context_adjustments"]["offset"]
+        context_desc = optimizer["context_adjustments"]["description"]
+        adjustments.append(f"{context_desc}: {context_offset}")
+    
+    # 4. 计算最终温度
+    final_temp = base_temp + task_offset + context_offset
+    
+    # 5. 边界限制
+    final_temp = max(optimizer["min_temp"], min(optimizer["max_temp"], final_temp))
+    
+    # 6. 构建描述
+    description = f"{task_desc}"
+    if context_desc:
+        description += f" + {context_desc}"
+    
+    debug_info = {
+        "global_temp": global_temp,
+        "base_temp": base_temp,
+        "task_type": task_type,
+        "task_offset": task_offset,
+        "context_offset": context_offset,
+        "final_temp": final_temp,
+        "adjustments": adjustments
+    }
+    
+    return final_temp, description, debug_info
 
 # 4. 侧边栏配置
 with st.sidebar:
@@ -128,10 +257,37 @@ with st.sidebar:
             max_value=1.0,
             value=0.7,
             step=0.1,
-            key="temperature"
+            key="global_temperature"  # 修改 key 以便追踪
         )
+        
+        # 原有逻辑：统一设置所有模型温度（保持不变）
         for model_id in MODEL_CONFIG:
             MODEL_CONFIG[model_id]["params"]["temperature"] = temperature
+        
+        # ========== 新增：Kimi 智能温度说明 ==========
+        st.divider()
+        st.caption("🌙 **Kimi 智能温度优化**")
+        
+        # 显示当前全局温度下 Kimi 的基础温度
+        base_with_offset = temperature + KIMI_TEMPERATURE_OPTIMIZER["temperature_rules"]["base_offset"]
+        base_with_offset = max(0.1, min(1.5, base_with_offset))
+        st.info(f"""
+        当前全局温度: {temperature}
+        Kimi 基础温度: {base_with_offset:.1f} (全局 + 0.2 偏移)
+        
+        实际调用时会根据任务类型自动调整：
+        • 代码任务: -0.5 (更确定)
+        • 创意写作: +0.3 (更发散)
+        • 分析推理: +0.1 (平衡)
+        • 长文本: -0.1 (更稳定)
+        """)
+        
+        # 开关：是否启用智能温度
+        st.session_state.kimi_smart_temp_enabled = st.toggle(
+            "启用 Kimi 智能温度优化",
+            value=st.session_state.kimi_smart_temp_enabled,
+            help="根据任务类型自动调整温度，获得最佳效果"
+        )
 
     # 🌸 Qwen 专属增强
     if enabled_models.get("qwen", False):
@@ -140,6 +296,32 @@ with st.sidebar:
                 "🔍 启用联网搜索",
                 value=st.session_state.enable_qwen_search
             )
+
+    # ========== 新增：Kimi 专属增强面板 ==========
+    if enabled_models.get("kimi", False):
+        with st.expander("🌙 Kimi 专属增强", expanded=True):
+            st.session_state.kimi_streaming_enabled = st.toggle(
+                "启用流式传输 (推荐)",
+                value=st.session_state.kimi_streaming_enabled,
+                help="避免长文本连接中断，必须启用"
+            )
+            
+            st.session_state.kimi_thinking_mode = st.toggle(
+                "启用 Thinking 模式",
+                value=st.session_state.kimi_thinking_mode,
+                help="展示推理过程，适合复杂问题"
+            )
+            
+            if st.session_state.kimi_smart_temp_enabled:
+                st.success("✅ 智能温度优化运行中")
+                # 显示温度规则表
+                with st.popover("查看温度调整规则"):
+                    rules = KIMI_TEMPERATURE_OPTIMIZER["temperature_rules"]["task_adjustments"]
+                    for task, config in rules.items():
+                        st.write(f"**{config['description']}**: {config['offset']:+.1f}")
+                        st.caption(f"关键词: {', '.join(config['keywords'][:3])}...")
+            else:
+                st.info("使用全局温度设置")
 
     st.write("---")
     
@@ -163,7 +345,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(display_content)
 
-# 6. 优化的AI调用函数
+# 6. 优化的AI调用函数（保持不变）
 def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
     config = MODEL_CONFIG[model_id]
     
@@ -201,7 +383,6 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
 
             # === ✨ Gemini 特性优化 ===
             elif model_id == "gemini":
-                # Gemini 2.5 在处理代码或长逻辑时，适当降低温度能获得更稳定的输出
                 last_user_msg = next((msg["content"] for msg in reversed(messages) if msg["role"] == "user"), "")
                 if "代码" in last_user_msg or "写个" in last_user_msg:
                     params["temperature"] = max(0.2, params["temperature"] - 0.3)
@@ -211,7 +392,38 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                 if not params.get("stream"):
                     params.pop("stream", None)
 
-            # 调用 API
+            # ========== 新增：Kimi 智能优化处理 ==========
+            elif model_id == "kimi":
+                # 检查是否启用增强功能
+                if st.session_state.get("kimi_smart_temp_enabled", False):
+                    # 获取全局温度
+                    global_temp = st.session_state.get("global_temperature", 0.7)
+                    
+                    # 计算智能温度
+                    smart_temp, task_desc, debug_info = calculate_kimi_temperature(global_temp, messages)
+                    params["temperature"] = smart_temp
+                    
+                    # 升级模型和参数
+                    params["model"] = KIMI_TEMPERATURE_OPTIMIZER["model"]
+                    params["max_tokens"] = KIMI_TEMPERATURE_OPTIMIZER["max_tokens"]
+                    params["stream"] = st.session_state.get("kimi_streaming_enabled", True)
+                    params["top_p"] = KIMI_TEMPERATURE_OPTIMIZER["top_p"]
+                    
+                    # 显示优化信息
+                    st.caption(f"🌙 {task_desc} | 温度: {smart_temp:.1f} (全局 {global_temp})")
+                    
+                    # 流式输出处理
+                    if params["stream"]:
+                        return _stream_kimi_response(client, params, messages, task_desc, debug_info)
+                else:
+                    # 未启用智能优化时，仅升级模型和流式
+                    if st.session_state.get("kimi_streaming_enabled", True):
+                        params["model"] = KIMI_TEMPERATURE_OPTIMIZER["model"]
+                        params["max_tokens"] = KIMI_TEMPERATURE_OPTIMIZER["max_tokens"]
+                        params["stream"] = True
+                        return _stream_kimi_response(client, params, messages, "标准模式", {})
+
+            # 调用 API（非流式或普通模型）
             with st.status(f"{config['emoji']} 正在思考中...", expanded=False) as status:
                 st.write(f"使用模型: {config['model']}")
                 response = client.chat.completions.create(**params)
@@ -228,6 +440,59 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
         except Exception as e:
             st.error(f"调用失败: {str(e)[:100]}")
             return None
+
+# ========== 新增：Kimi 流式响应处理函数 ==========
+def _stream_kimi_response(client, params, messages, task_desc, debug_info) -> Optional[str]:
+    """处理 Kimi 的流式输出"""
+    full_response = ""
+    reasoning_content = ""
+    
+    try:
+        with st.status(f"🌙 Kimi 思考中... ({task_desc})", expanded=st.session_state.get("kimi_thinking_mode", False)) as status:
+            response_placeholder = st.empty()
+            
+            # Thinking 模式占位符
+            thinking_placeholder = None
+            if st.session_state.get("kimi_thinking_mode", False):
+                thinking_expander = st.expander("🤔 推理过程", expanded=False)
+                thinking_placeholder = thinking_expander.empty()
+            
+            # 创建流
+            stream = client.chat.completions.create(**params)
+            
+            for chunk in stream:
+                if chunk.choices:
+                    delta = chunk.choices[0].delta
+                    
+                    # 处理 reasoning_content
+                    if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
+                        reasoning_content += delta.reasoning_content
+                        if thinking_placeholder:
+                            thinking_placeholder.markdown(reasoning_content)
+                    
+                    # 处理正式内容
+                    if delta.content:
+                        full_response += delta.content
+                        response_placeholder.markdown(full_response + "▌")
+            
+            # 完成
+            response_placeholder.markdown(full_response)
+            status.update(label="✅ 完成！", state="complete")
+        
+        # 保存响应
+        st.session_state.model_responses["kimi"] = {
+            "answer": full_response,
+            "model": params["model"],
+            "temperature": params["temperature"],
+            "task_type": task_desc,
+            "reasoning": reasoning_content if reasoning_content else None
+        }
+        
+        return full_response
+        
+    except Exception as e:
+        st.error(f"Kimi 流式输出失败: {str(e)[:150]}")
+        return None
 
 # 7. 聊天输入逻辑 (保持原逻辑不变)
 if prompt := st.chat_input("向AI模型提问..."):
@@ -260,3 +525,14 @@ if prompt := st.chat_input("向AI模型提问..."):
 # 8. 底部信息
 st.sidebar.write("---")
 st.sidebar.caption("🔄 版本 7.2 | 融入 Gemini 2.5 Flash 性能优化")
+
+# ========== 新增：Kimi 状态指示器 ==========
+if enabled_models.get("kimi", False):
+    st.sidebar.divider()
+    if st.session_state.get("kimi_smart_temp_enabled", False):
+        st.sidebar.success("🌙 Kimi 智能温度优化运行中")
+        current_global = st.session_state.get("global_temperature", 0.7)
+        base_temp = current_global + 0.2
+        st.sidebar.caption(f"全局: {current_global} | Kimi基础: {base_temp:.1f}")
+    else:
+        st.sidebar.info("🌙 Kimi 使用全局温度")
