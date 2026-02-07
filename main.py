@@ -69,54 +69,45 @@ if prompt := st.chat_input("向 5 个 AI 同时发起提问..."):
             "https://chat.deepseek.com/"
         )
         
-# --- 2. Gemini (终极全维度诊断版) ---
+# --- 2. Gemini (权限探测版) ---
         with cols[1]:
-            st.subheader("✨ Gemini 诊断")
+            st.subheader("✨ Gemini 权限探测")
             gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
             
-            if not gemini_key:
-                st.warning("未配置 Key")
-                ans_gemini = None
-            else:
-                # 定义诊断矩阵：尝试不同的 (接口路径, 模型格式) 组合
-                test_matrix = [
-                    {"url": "https://generativelanguage.googleapis.com/v1beta/openai/", "model": "gemini-1.5-flash", "note": "v1beta + 标准名"},
-                    {"url": "https://generativelanguage.googleapis.com/v1beta/openai/", "model": "models/gemini-1.5-flash", "note": "v1beta + 路径名"},
-                    {"url": "https://generativelanguage.googleapis.com/v1/openai/", "model": "gemini-1.5-flash", "note": "v1 + 标准名"},
-                    {"url": "https://generativelanguage.googleapis.com/v1/openai/", "model": "models/gemini-1.5-flash", "note": "v1 + 路径名"}
-                ]
+            try:
+                import requests
+                # 这一步是直接向 Google 询问：我这个 Key 能用哪些模型？
+                url = f"https://generativelanguage.googleapis.com/v1beta/models?key={gemini_key}"
+                response = requests.get(url)
+                models_data = response.json()
                 
-                success = False
-                ans_gemini = None
-
-                # 开始矩阵轮询
-                for i, test in enumerate(test_matrix):
-                    # 在界面上显示当前正在测试哪种组合
-                    with st.expander(f"🔍 测试方案 {i+1}: {test['note']}", expanded=(not success)):
-                        try:
-                            client = OpenAI(api_key=gemini_key, base_url=test['url'])
-                            r = client.chat.completions.create(
-                                model=test['model'],
-                                messages=st.session_state.messages,
-                                timeout=15
-                            )
-                            ans_gemini = r.choices[0].message.content
-                            st.success(f"✅ 成功! 方案 {i+1} 有效")
-                            st.write(ans_gemini)
-                            success = True
-                            # 如果成功了，就在这个 expander 里显示结果，并停止后续测试
-                        except Exception as e:
-                            # 记录详细错误，方便我们分析
-                            err_msg = str(e)
-                            st.write(f"❌ 失败原因: `{err_msg[:100]}`")
+                if "models" in models_data:
+                    # 获取前 3 个可用模型的名字
+                    available_models = [m["name"] for m in models_data["models"]]
+                    st.write("✅ 你的 Key 可用模型：")
+                    for m in available_models[:5]:
+                        st.code(m)
                     
-                    if success:
-                        break # 找到可行方案，退出循环
-
-                if not success:
-                    st.error("❌ 所有方案均失效。")
-                    # 如果全部失败，提供一个直接跳转的链接
-                    st.markdown(f"[去网页版直接聊](https://gemini.google.com/)")
+                    # 尝试用列表里的第一个模型跑一下
+                    test_model = available_models[0]
+                    client = OpenAI(
+                        api_key=gemini_key,
+                        base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+                    )
+                    r = client.chat.completions.create(
+                        model=test_model.replace("models/", ""), # 去掉 models/ 前缀
+                        messages=st.session_state.messages,
+                        timeout=15
+                    )
+                    st.write(f"🚀 使用 {test_model} 成功回答：")
+                    st.write(r.choices[0].message.content)
+                    ans_gemini = r.choices[0].message.content
+                else:
+                    st.error("❌ 该 Key 没关联任何模型。请去 AI Studio 重新创建一个 Key，并选择 'Create API key in a new project'。")
+                    ans_gemini = None
+            except Exception as e:
+                st.error(f"❌ 探测失败: {str(e)}")
+                ans_gemini = None
         
         # --- 3. Kimi 官方对话链接 ---
         ans_kimi = ask_ai(
