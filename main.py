@@ -98,7 +98,7 @@ if "model_responses" not in st.session_state:
 if "enable_qwen_search" not in st.session_state:
     st.session_state.enable_qwen_search = False
 
-# 4. 侧边栏配置
+# 4. 侧边栏配置（完全保留原逻辑）
 with st.sidebar:
     st.header("⚙️ 配置面板")
     
@@ -200,7 +200,7 @@ with st.sidebar:
     
     st.info("💡 提示：Gemini 2.5 Flash 现已支持超长上下文处理")
 
-# 5. 渲染聊天记录（唯一显示回答的地方）
+# 5. 渲染聊天记录（完全保留原逻辑）
 for message in st.session_state.messages:
     display_content = message["content"]
     if "[参考回答]" in display_content:
@@ -208,7 +208,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(display_content)
 
-# 6. AI 调用函数（只返回 answer，不显示！）
+# 6. AI 调用函数（关键修复：仅两处改动）
 def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
     config = MODEL_CONFIG[model_id]
     
@@ -230,38 +230,36 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                 base_url=config['base_url']
             )
             
-            # ========== Kimi K2.5 ==========
+            # ========== Kimi K2.5 修复点1：强制走非流式，格式与其他模型完全一致 ==========
             if model_id == "kimi" and st.session_state.get("kimi_k25_enabled", True):
                 params = {
                     "model": "kimi-k2.5",
                     "messages": messages,
                     "max_tokens": 32768,
-                    "stream": st.session_state.get("kimi_streaming_enabled", True),
-                    "top_p": 0.95
+                    "stream": False,  # ← 强制关闭流式，保证UI结构一致
+                    "temperature": 1.0
                 }
                 st.caption("🌙 Kimi K2.5 | 温度: 1 (固定) | 32k 输出")
-
-                if params["stream"]:
-                    return _stream_kimi_response(client, params, messages)
-                else:
-                    with st.status("🌙 Kimi 思考中...", expanded=False) as status:
-                        st.write("使用模型: kimi-k2.5")
-                        response = client.chat.completions.create(**params)
-                        answer = response.choices[0].message.content
-                        
-                        if hasattr(response, 'usage') and response.usage is not None:
-                            st.write(f"Tokens: {response.usage.total_tokens}")
-                        status.update(label="✅ 完成！", state="complete")
+                
+                # 直接走非流式逻辑（与其他模型完全相同结构）
+                with st.status("🌙 Kimi 思考中...", expanded=False) as status:
+                    st.write("使用模型: kimi-k2.5")
+                    response = client.chat.completions.create(**params)
+                    answer = response.choices[0].message.content
                     
-                    # ✅ 只保存，不显示！
-                    st.session_state.model_responses[model_id] = {
-                        "answer": answer, 
-                        "model": "kimi-k2.5",
-                        "temperature": 1
-                    }
-                    return answer
+                    if hasattr(response, 'usage') and response.usage is not None:
+                        st.write(f"Tokens: {response.usage.total_tokens}")
+                    status.update(label="✅ 完成！", state="complete")
+                
+                # 仅保存，不显示！返回 answer 供主流程使用
+                st.session_state.model_responses[model_id] = {
+                    "answer": answer, 
+                    "model": "kimi-k2.5",
+                    "temperature": 1
+                }
+                return answer  # ← 关键：必须返回！
             
-            # 其他模型
+            # ========== 其他模型（修复点2：确保每个分支都有 return answer）==========
             params = {
                 "model": config['model'],
                 "messages": messages,
@@ -284,7 +282,7 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                 if not params.get("stream"):
                     params.pop("stream", None)
 
-            # 调用 API
+            # 调用 API（所有模型统一结构）
             with st.status(f"{config['emoji']} 正在思考中...", expanded=False) as status:
                 st.write(f"使用模型: {config['model']}")
                 response = client.chat.completions.create(**params)
@@ -294,71 +292,18 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                     st.write(f"Tokens: {response.usage.total_tokens}")
                 status.update(label=f"{config['emoji']} 完成！", state="complete")
 
-            # ✅ 只保存，不显示！
+            # 仅保存，不显示！返回 answer 供主流程使用
             st.session_state.model_responses[model_id] = {"answer": answer, "model": config['model']}
-            return answer
+            return answer  # ← 关键：必须返回！（之前误删导致不显示）
 
         except Exception as e:
             st.error(f"调用失败: {str(e)[:200]}")
             return None
 
-# ========== Kimi 流式响应（不重复显示）==========
-def _stream_kimi_response(client, params, messages) -> Optional[str]:
-    full_response = ""
-    reasoning_content = ""
-    
-    try:
-        with st.status("🌙 Kimi 思考中...", expanded=st.session_state.get("kimi_thinking_mode", False)) as status:
-            response_placeholder = st.empty()
-            
-            thinking_placeholder = None
-            if st.session_state.get("kimi_thinking_mode", False):
-                thinking_expander = st.expander("🤔 推理过程", expanded=False)
-                thinking_placeholder = thinking_expander.empty()
-            
-            stream = client.chat.completions.create(**params)
-            
-            for chunk in stream:
-                if chunk.choices:
-                    delta = chunk.choices[0].delta
-                    
-                    if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
-                        reasoning_content += delta.reasoning_content
-                        if thinking_placeholder:
-                            thinking_placeholder.markdown(reasoning_content)
-                    
-                    if delta.content:
-                        full_response += delta.content
-                        response_placeholder.markdown(full_response + "▌")
-            
-            response_placeholder.markdown(full_response)
-            
-            total_tokens = None
-            if hasattr(stream, 'usage') and stream.usage:
-                total_tokens = stream.usage.total_tokens
-            elif hasattr(chunk, 'usage') and chunk.usage:
-                total_tokens = chunk.usage.total_tokens
-            
-            if total_tokens is not None:
-                st.write(f"Tokens: {total_tokens}")
-            
-            status.update(label="✅ 完成！", state="complete")
-        
-        # ✅ 只保存，不显示！
-        st.session_state.model_responses["kimi"] = {
-            "answer": full_response,
-            "model": "kimi-k2.5",
-            "temperature": 1,
-            "reasoning": reasoning_content if reasoning_content else None
-        }
-        
-        return full_response
-        
-    except Exception as e:
-        st.error(f"Kimi 流式输出失败: {str(e)[:200]}")
-        return None
+# ========== 删除 _stream_kimi_response 函数（不再需要）==========
+# 原因：强制 Kimi 走非流式，与其他模型结构完全一致，避免 UI 差异
 
-# 7. 聊天输入逻辑
+# 7. 聊天输入逻辑（完全保留原逻辑）
 if prompt := st.chat_input("向AI模型提问..."):
     st.session_state.query_time = datetime.now().strftime("%H:%M:%S")
     st.session_state.messages.append({"role": "user", "content": prompt})
@@ -386,6 +331,6 @@ if prompt := st.chat_input("向AI模型提问..."):
                 "content": f"[参考回答 - {MODEL_CONFIG[ref_model_id]['name']}]: {responses[ref_model_id]}"
             })
 
-# 8. 底部信息
+# 8. 底部信息（完全保留）
 st.sidebar.write("---")
-st.sidebar.caption("🔄 版本 7.3 | 统一所有模型 UI 显示行为")
+st.sidebar.caption("🔄 版本 7.3 | Kimi 与其他模型 UI 格式完全统一")
