@@ -110,22 +110,6 @@ if "thinking_mode" not in st.session_state:
 # 4. 侧边栏配置
 with st.sidebar:
     st.header("⚙️ 配置面板")
-    
-    # 思考模式开关 - 放在显眼位置
-    st.divider()
-    thinking_mode = st.toggle(
-        "🧠 启用思考模式",
-        value=st.session_state.thinking_mode,
-        help="思考模式会显示推理过程，非思考模式直接给出答案"
-    )
-    st.session_state.thinking_mode = thinking_mode
-    
-    if thinking_mode:
-        st.success("✅ 思考模式已启用 - 显示详细推理过程")
-    else:
-        st.info("⚡ 非思考模式 - 直接输出答案")
-    
-    st.divider()
 
     enabled_models = {}
     for model_id, config in MODEL_CONFIG.items():
@@ -146,6 +130,25 @@ with st.sidebar:
     st.write("---")
 
     with st.expander("高级设置"):
+        # 思考模式开关 - 在高级设置里面
+        st.subheader("🧠 思考模式")
+        thinking_mode = st.toggle(
+            "启用思考模式",
+            value=st.session_state.thinking_mode,
+            help="思考模式会显示推理过程，非思考模式直接给出答案",
+            key="thinking_mode_toggle"
+        )
+        st.session_state.thinking_mode = thinking_mode
+        
+        if thinking_mode:
+            st.success("✅ 思考模式已启用 - 显示详细推理过程")
+            st.caption("适合复杂问题、数学计算、逻辑分析等需要推理的场景")
+        else:
+            st.info("⚡ 非思考模式 - 直接输出答案")
+            st.caption("适合简单问答、快速查询等场景，响应更快")
+        
+        st.divider()
+        
         reasoning_level = st.select_slider(
             "DeepSeek 推理强度",
             options=["low", "medium", "high"],
