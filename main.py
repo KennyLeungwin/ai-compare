@@ -84,7 +84,7 @@ MODEL_CONFIG = {
         "name": "Mistral AI (Mixtral-8x22B)",
         "model": "mistral-large-latest",  # 或 "mistralai/Mixtral-8x22B-Instruct-v0.1"
         "base_url": "https://api.mistral.ai/v1",
-        "web_url": "https://mistral.ai",
+        "web_url": "https://chat.mistral.ai/",
         "emoji": "🦉",
         "env_key": "MISTRAL_API_KEY",
         "params": {
@@ -123,7 +123,7 @@ with st.sidebar:
     for model_id, config in MODEL_CONFIG.items():
         key = os.getenv(config['env_key'])
         status = "✅ 已配置" if key else "❌ 未配置"
-        st.write(f"{config['emoji']}{config['web_url']} {config['name']}: {status}")
+        st.write(f"{config['emoji']} {config['name']}[{config['name']}]({config['web_url']})": {status}")
 
     st.write("---")
 
