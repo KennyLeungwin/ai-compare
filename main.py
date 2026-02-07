@@ -79,7 +79,21 @@ MODEL_CONFIG = {
             "max_tokens": 4096,
             "stream": False
         }
+    },
+    "mistral": {
+    "name": "Mistral AI (Mixtral-8x22B)",
+    "model": "mistralai/Mixtral-8x22B-Instruct-v0.1",  # 或 "mistral-medium"
+    "base_url": "https://api.mistral.ai/v1",
+    "web_url": "https://mistral.ai",
+    "emoji": "🦉",
+    "env_key": "MISTRAL_API_KEY",  # 【API Key 变量名，需添加到 .env 文件】
+    "params": {
+        "temperature": 0.7,
+        "max_tokens": 8192,
+        "stream": False,
+        "safe_prompt": False  # Mistral 特有参数
     }
+}
 }
 
 # 初始化增强设置
@@ -152,6 +166,15 @@ with st.sidebar:
         • 流式传输
         • 256k 上下文
         """)
+            st.divider()
+        st.caption("🦉 **Mistral 特有设置**")
+        mistral_safe_mode = st.toggle(
+            "启用内容安全过滤 (safe_prompt)",
+            value=False,
+            key="mistral_safe_mode"
+        )
+        MODEL_CONFIG["mistral"]["params"]["safe_prompt"] = mistral_safe_mode  # 实时更新配置
+    
 
     if enabled_models.get("qwen", False):
         with st.expander("🌸 Qwen 专属增强"):
@@ -282,7 +305,20 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
             elif model_id == "deepseek" and "reasoning_effort" in params:
                 if not params.get("stream"):
                     params.pop("stream", None)
+            elif model_id == "mistral":
+                    # 动态调整温度（根据问题类型）
+                    last_user_msg = next((msg["content"] for msg in reversed(messages) if msg["role"] == "user"), "")
+                    if "代码" in last_user_msg or "program" in last_user_msg.lower():
+                        params["temperature"] = 0.3  # 代码问题降低随机性
+                    elif "创意" in last_user_msg or "story" in last_user_msg.lower():
+                        params["temperature"] = 0.9  # 创意写作提高随机性
+                    # 使用全局配置的 safe_prompt 设置
+                    params["safe_prompt"] = MODEL_CONFIG["mistral"]["params"]["safe_prompt"]
 
+                    # 【修改】在温度滑块的循环中排除 Mistral（因为 Mistral 需要单独处理）
+                    for model_id in MODEL_CONFIG:
+                        if model_id != "mistral":  # Mistral 温度单独处理
+                            MODEL_CONFIG[model_id]["params"]["temperature"] = temperature
             # 调用 API
             with st.status(f"{config['emoji']} 正在思考中...", expanded=False) as status:
                 st.write(f"使用模型: {config['model']}")
