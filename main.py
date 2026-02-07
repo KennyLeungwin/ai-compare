@@ -114,7 +114,7 @@ with st.sidebar:
         default_enabled = False if model_id == "gpt" else True
         enabled_models[model_id] = st.checkbox(
             f"{config['emoji']} {config['name']}",
-            value=True,
+            value=default_enabled,
             key=f"enable_{model_id}"
         )
 
