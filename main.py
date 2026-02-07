@@ -10,9 +10,9 @@ st.set_page_config(
     layout="wide",
     page_icon="🤖"
 )
-st.title("🧠 五模型聊天对比 (V7.2 多模型增强版)")
+st.title("🧠 五模型聊天对比 (V7.3 统一UI版)")
 
-# 2. 模型配置信息（修复：去除所有 URL 末尾空格）
+# 2. 模型配置信息
 MODEL_CONFIG = {
     "deepseek": {
         "name": "DeepSeek Reasoning",
@@ -82,7 +82,7 @@ MODEL_CONFIG = {
     }
 }
 
-# 新增：Kimi 增强功能配置
+# 初始化增强设置
 if "kimi_k25_enabled" not in st.session_state:
     st.session_state.kimi_k25_enabled = True
 if "kimi_streaming_enabled" not in st.session_state:
@@ -102,7 +102,6 @@ if "enable_qwen_search" not in st.session_state:
 with st.sidebar:
     st.header("⚙️ 配置面板")
     
-    st.subheader("选择要使用的模型")
     enabled_models = {}
     for model_id, config in MODEL_CONFIG.items():
         enabled_models[model_id] = st.checkbox(
@@ -201,7 +200,7 @@ with st.sidebar:
     
     st.info("💡 提示：Gemini 2.5 Flash 现已支持超长上下文处理")
 
-# 5. 渲染聊天记录
+# 5. 渲染聊天记录（唯一显示回答的地方）
 for message in st.session_state.messages:
     display_content = message["content"]
     if "[参考回答]" in display_content:
@@ -209,7 +208,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(display_content)
 
-# 6. 优化的AI调用函数
+# 6. AI 调用函数（只返回 answer，不显示！）
 def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
     config = MODEL_CONFIG[model_id]
     
@@ -231,7 +230,7 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                 base_url=config['base_url']
             )
             
-            # ========== Kimi K2.5 参数配置 ==========
+            # ========== Kimi K2.5 ==========
             if model_id == "kimi" and st.session_state.get("kimi_k25_enabled", True):
                 params = {
                     "model": "kimi-k2.5",
@@ -240,12 +239,11 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                     "stream": st.session_state.get("kimi_streaming_enabled", True),
                     "top_p": 0.95
                 }
-             
+                st.caption("🌙 Kimi K2.5 | 温度: 1 (固定) | 32k 输出")
 
                 if params["stream"]:
                     return _stream_kimi_response(client, params, messages)
                 else:
-                    # 非流式：和其他模型完全一致
                     with st.status("🌙 Kimi 思考中...", expanded=False) as status:
                         st.write("使用模型: kimi-k2.5")
                         response = client.chat.completions.create(**params)
@@ -255,7 +253,7 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                             st.write(f"Tokens: {response.usage.total_tokens}")
                         status.update(label="✅ 完成！", state="complete")
                     
-                    st.markdown(answer)
+                    # ✅ 只保存，不显示！
                     st.session_state.model_responses[model_id] = {
                         "answer": answer, 
                         "model": "kimi-k2.5",
@@ -263,7 +261,7 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                     }
                     return answer
             
-            # 其他模型使用原有逻辑
+            # 其他模型
             params = {
                 "model": config['model'],
                 "messages": messages,
@@ -286,7 +284,7 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                 if not params.get("stream"):
                     params.pop("stream", None)
 
-            # 调用 API（其他模型）
+            # 调用 API
             with st.status(f"{config['emoji']} 正在思考中...", expanded=False) as status:
                 st.write(f"使用模型: {config['model']}")
                 response = client.chat.completions.create(**params)
@@ -296,7 +294,7 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                     st.write(f"Tokens: {response.usage.total_tokens}")
                 status.update(label=f"{config['emoji']} 完成！", state="complete")
 
-            st.markdown(answer)
+            # ✅ 只保存，不显示！
             st.session_state.model_responses[model_id] = {"answer": answer, "model": config['model']}
             return answer
 
@@ -304,9 +302,8 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
             st.error(f"调用失败: {str(e)[:200]}")
             return None
 
-# ========== Kimi 流式响应处理 ==========
+# ========== Kimi 流式响应（不重复显示）==========
 def _stream_kimi_response(client, params, messages) -> Optional[str]:
-    """处理 Kimi K2.5 的流式输出"""
     full_response = ""
     reasoning_content = ""
     
@@ -335,11 +332,19 @@ def _stream_kimi_response(client, params, messages) -> Optional[str]:
                         response_placeholder.markdown(full_response + "▌")
             
             response_placeholder.markdown(full_response)
+            
+            total_tokens = None
+            if hasattr(stream, 'usage') and stream.usage:
+                total_tokens = stream.usage.total_tokens
+            elif hasattr(chunk, 'usage') and chunk.usage:
+                total_tokens = chunk.usage.total_tokens
+            
+            if total_tokens is not None:
+                st.write(f"Tokens: {total_tokens}")
+            
             status.update(label="✅ 完成！", state="complete")
         
-        # ✅ 关键修复：在 st.status 外部再输出一次回答，确保和其他模型一致
-        st.markdown(full_response)
-        
+        # ✅ 只保存，不显示！
         st.session_state.model_responses["kimi"] = {
             "answer": full_response,
             "model": "kimi-k2.5",
@@ -350,10 +355,7 @@ def _stream_kimi_response(client, params, messages) -> Optional[str]:
         return full_response
         
     except Exception as e:
-        error_msg = str(e)
-        st.error(f"Kimi 流式输出失败: {error_msg[:200]}")
-        print(f"Kimi Error Details: {error_msg}")
-        print(f"Params sent: {params}")
+        st.error(f"Kimi 流式输出失败: {str(e)[:200]}")
         return None
 
 # 7. 聊天输入逻辑
@@ -386,12 +388,4 @@ if prompt := st.chat_input("向AI模型提问..."):
 
 # 8. 底部信息
 st.sidebar.write("---")
-st.sidebar.caption("🔄 版本 7.2 | 融入 Gemini 2.5 Flash 性能优化")
-
-if enabled_models.get("kimi", False):
-    st.sidebar.divider()
-    if st.session_state.get("kimi_k25_enabled", True):
-        st.sidebar.success("🌙 Kimi K2.5 运行中")
-        st.sidebar.caption("温度: 1 (固定) | 32k 输出 | 流式传输")
-    else:
-        st.sidebar.info("🌙 Kimi 标准模式")
+st.sidebar.caption("🔄 版本 7.3 | 统一所有模型 UI 显示行为")
