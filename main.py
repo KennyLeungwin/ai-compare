@@ -91,7 +91,6 @@ MODEL_CONFIG = {
             "temperature": 0.7,
             "max_tokens": 8192,
             "stream": False,
-           
         }
     }
 }
@@ -176,7 +175,7 @@ with st.sidebar:
        #     "启用内容安全过滤 (safe_prompt)",
        #     value=False,
        #     key="mistral_safe_mode"
-      #  )
+       # )
        # MODEL_CONFIG["mistral"]["params"]["safe_prompt"] = mistral_safe_mode
 
     if enabled_models.get("qwen", False):
@@ -214,7 +213,7 @@ with st.sidebar:
 
     st.write("---")
 
-    col1, col2 = st.columns(2)  # ✅ 修复：补全右括号
+    col1, col2 = st.columns(2)
     with col1:
         if st.button("🗑️ 清空对话", use_container_width=True):
             st.session_state.messages = []
@@ -284,8 +283,8 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                 }
                 return answer
             
-            # ========== Mistral AI ==========
-               elif model_id == "mistral":
+            # ========== Mistral AI ==========  ← 修复：此处缩进与上方 if 对齐
+            elif model_id == "mistral":
                 params = {
                     "model": config["model"],
                     "messages": messages,
