@@ -240,7 +240,7 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                     "stream": st.session_state.get("kimi_streaming_enabled", True),
                     "top_p": 0.95
                 }
-                st.caption("🌙 Kimi K2.5 | 温度: 1 (固定) | 32k 输出")
+             
 
                 if params["stream"]:
                     return _stream_kimi_response(client, params, messages)
