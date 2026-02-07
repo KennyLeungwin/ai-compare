@@ -82,7 +82,7 @@ MODEL_CONFIG = {
     },
     "mistral": {
         "name": "Mistral AI (Mixtral-8x22B)",
-        "model": "mistralai/Mixtral-8x22B-Instruct-v0.1",
+        "model": "mixtral-8x22b-instruct",
         "base_url": "https://api.mistral.ai/v1",
         "web_url": "https://mistral.ai",
         "emoji": "🦉",
