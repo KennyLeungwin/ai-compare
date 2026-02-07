@@ -91,7 +91,7 @@ MODEL_CONFIG = {
             "temperature": 0.7,
             "max_tokens": 8192,
             "stream": False,
-            "safe_prompt": False
+           
         }
     }
 }
@@ -172,12 +172,12 @@ with st.sidebar:
         # Mistral 特有设置
         st.divider()
         st.caption("🦉 **Mistral 特有设置**")
-        mistral_safe_mode = st.toggle(
-            "启用内容安全过滤 (safe_prompt)",
-            value=False,
-            key="mistral_safe_mode"
-        )
-        MODEL_CONFIG["mistral"]["params"]["safe_prompt"] = mistral_safe_mode
+       # mistral_safe_mode = st.toggle(
+       #     "启用内容安全过滤 (safe_prompt)",
+       #     value=False,
+       #     key="mistral_safe_mode"
+      #  )
+       # MODEL_CONFIG["mistral"]["params"]["safe_prompt"] = mistral_safe_mode
 
     if enabled_models.get("qwen", False):
         with st.expander("🌸 Qwen 专属增强"):
@@ -292,7 +292,7 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                     "temperature": config["params"]["temperature"],
                     "max_tokens": config["params"]["max_tokens"],
                     "stream": False,
-                    "safe_prompt": config["params"]["safe_prompt"]
+                   # "safe_prompt": config["params"]["safe_prompt"]
                 }
                 
                 with st.status("🦉 Mistral 正在思考中...", expanded=False) as status:
