@@ -32,7 +32,7 @@ MODEL_CONFIG = {
         "name": "Gemini 2.5 Flash",
         "model": "gemini-2.5-flash",
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
-        "web_url": "https://aistudio.google.com",
+        "web_url": "https://gemini.google.com/",
         "emoji": "✨",
         "env_key": "GEMINI_API_KEY",
         "params": {
@@ -71,7 +71,7 @@ MODEL_CONFIG = {
         "name": "通义千问 Max",
         "model": "qwen-max",
         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "web_url": "https://tongyi.aliyun.com",
+        "web_url": "https://www.qianwen.com/",
         "emoji": "🌸",
         "env_key": "QWEN_API_KEY",
         "params": {
@@ -123,7 +123,7 @@ with st.sidebar:
     for model_id, config in MODEL_CONFIG.items():
         key = os.getenv(config['env_key'])
         status = "✅ 已配置" if key else "❌ 未配置"
-        st.write(f"{config['emoji']} {config['name']}: {status}")
+        st.write(f"{config['emoji']}{config['web_url']} {config['name']}: {status}")
 
     st.write("---")
 
