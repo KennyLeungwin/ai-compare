@@ -10,7 +10,7 @@ st.set_page_config(
     layout="wide",
     page_icon="🤖"
 )
-st.title("🧠 六模型聊天对比 (V8.1 - 回答直接显示)")
+st.title("🧠 六模型聊天对比 (V8.2 - 思考模式增强)")
 
 # 2. 模型配置信息（新增 Mistral）
 MODEL_CONFIG = {
@@ -82,7 +82,7 @@ MODEL_CONFIG = {
     },
     "mistral": {
         "name": "Mistral AI (Mixtral-8x22B)",
-        "model": "mistral-large-latest",  # 或 "mistralai/Mixtral-8x22B-Instruct-v0.1"
+        "model": "mistral-large-latest",
         "base_url": "https://api.mistral.ai/v1",
         "web_url": "https://chat.mistral.ai/",
         "emoji": "🦉",
@@ -104,10 +104,28 @@ if "enable_qwen_search" not in st.session_state:
     st.session_state.enable_qwen_search = False
 if "kimi_k25_enabled" not in st.session_state:
     st.session_state.kimi_k25_enabled = True
+if "thinking_mode" not in st.session_state:
+    st.session_state.thinking_mode = True  # 默认启用思考模式
 
 # 4. 侧边栏配置
 with st.sidebar:
     st.header("⚙️ 配置面板")
+    
+    # 思考模式开关 - 放在显眼位置
+    st.divider()
+    thinking_mode = st.toggle(
+        "🧠 启用思考模式",
+        value=st.session_state.thinking_mode,
+        help="思考模式会显示推理过程，非思考模式直接给出答案"
+    )
+    st.session_state.thinking_mode = thinking_mode
+    
+    if thinking_mode:
+        st.success("✅ 思考模式已启用 - 显示详细推理过程")
+    else:
+        st.info("⚡ 非思考模式 - 直接输出答案")
+    
+    st.divider()
 
     enabled_models = {}
     for model_id, config in MODEL_CONFIG.items():
@@ -207,31 +225,69 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
         try:
             client = OpenAI(api_key=api_key, base_url=config['base_url'])
             
+            # 根据思考模式调整消息
+            current_messages = messages.copy()
+            if st.session_state.thinking_mode:
+                # 在思考模式下，添加提示词要求展示推理过程
+                thinking_prompts = {
+                    "deepseek": "\n\n请一步步展示你的思考过程，最后给出最终答案。",
+                    "gemini": "\n\n请展示你的推理步骤，然后给出最终结论。",
+                    "kimi": "\n\n请详细展示你的思考过程，然后给出答案。",
+                    "gpt": "\n\n请逐步展示你的推理，最后给出结论。",
+                    "qwen": "\n\n请展示你的思考步骤，然后给出最终回答。",
+                    "mistral": "\n\n请一步步推理，展示思考过程，最后给出答案。"
+                }
+                
+                last_user_msg_index = next(
+                    (i for i in range(len(current_messages)-1, -1, -1) 
+                     if current_messages[i]["role"] == "user"),
+                    -1
+                )
+                
+                if last_user_msg_index >= 0:
+                    prompt = current_messages[last_user_msg_index]["content"]
+                    thinking_prompt = thinking_prompts.get(model_id, "\n\n请展示你的思考过程。")
+                    
+                    # 检查是否已经是思考类问题
+                    is_thinking_request = any(keyword in prompt.lower() for keyword in [
+                        "思考", "推理", "分析", "解释", "为什么", "如何", "步骤",
+                        "think", "reason", "analyze", "explain", "why", "how", "step"
+                    ])
+                    
+                    if not is_thinking_request:
+                        current_messages[last_user_msg_index]["content"] = prompt + thinking_prompt
+            
             # ========== Kimi K2.5 ==========
             if model_id == "kimi" and st.session_state.get("kimi_k25_enabled", True):
                 params = {
                     "model": "kimi-k2.5",
-                    "messages": messages,
+                    "messages": current_messages if st.session_state.thinking_mode else messages,
                     "max_tokens": 32768,
                     "stream": False,
                     "temperature": 1.0
                 }
                 
-                
-                with st.status("🌙 Kimi 思考中...", expanded=False) as status:
-                    st.write("使用模型: kimi-k2.5")
+                # 思考模式的状态显示
+                status_msg = "🌙 Kimi 思考中..." if st.session_state.thinking_mode else "🌙 Kimi 回答中..."
+                with st.status(status_msg, expanded=st.session_state.thinking_mode) as status:
+                    st.write(f"使用模型: kimi-k2.5")
+                    st.write(f"模式: {'🧠 思考模式' if st.session_state.thinking_mode else '⚡ 非思考模式'}")
+                    
                     response = client.chat.completions.create(**params)
                     answer = response.choices[0].message.content
                     
                     if hasattr(response, 'usage') and response.usage is not None:
                         st.write(f"Tokens: {response.usage.total_tokens}")
-                    status.update(label="✅ 完成！", state="complete")
+                    
+                    status_label = "✅ 思考完成！" if st.session_state.thinking_mode else "✅ 回答完成！"
+                    status.update(label=status_label, state="complete")
                 
-                # ✅ 关键：直接显示回答
+                # 显示回答
                 st.markdown(answer)
                 st.session_state.model_responses[model_id] = {
                     "answer": answer, 
-                    "model": "kimi-k2.5"
+                    "model": "kimi-k2.5",
+                    "mode": "thinking" if st.session_state.thinking_mode else "direct"
                 }
                 return answer
             
@@ -239,7 +295,7 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
             elif model_id == "mistral":
                 params = {
                     "model": config["model"],
-                    "messages": messages,
+                    "messages": current_messages if st.session_state.thinking_mode else messages,
                     "temperature": config["params"]["temperature"],
                     "max_tokens": config["params"]["max_tokens"],
                     "stream": False
@@ -252,25 +308,33 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                 elif "创意" in last_user_msg or "story" in last_user_msg.lower():
                     params["temperature"] = 0.9
 
-                with st.status("🦉 Mistral 正在思考中...", expanded=False) as status:
+                status_msg = "🦉 Mistral 思考中..." if st.session_state.thinking_mode else "🦉 Mistral 回答中..."
+                with st.status(status_msg, expanded=st.session_state.thinking_mode) as status:
                     st.write(f"使用模型: {config['model']}")
+                    st.write(f"模式: {'🧠 思考模式' if st.session_state.thinking_mode else '⚡ 非思考模式'}")
+                    
                     response = client.chat.completions.create(**params)
                     answer = response.choices[0].message.content
 
                     if hasattr(response, 'usage') and response.usage is not None:
                         st.write(f"Tokens: {response.usage.total_tokens}")
-                    status.update(label="✅ 完成！", state="complete")
+                    
+                    status_label = "✅ 思考完成！" if st.session_state.thinking_mode else "✅ 回答完成！"
+                    status.update(label=status_label, state="complete")
 
-                # ✅ 关键：直接显示回答（不在 try 内部嵌套太深）
                 st.markdown(answer)
-                st.session_state.model_responses[model_id] = {"answer": answer, "model": config["model"]}
+                st.session_state.model_responses[model_id] = {
+                    "answer": answer, 
+                    "model": config["model"],
+                    "mode": "thinking" if st.session_state.thinking_mode else "direct"
+                }
                 return answer
 
             # ========== 其他模型 ==========
             else:
                 params = {
                     "model": config['model'],
-                    "messages": messages,
+                    "messages": current_messages if st.session_state.thinking_mode else messages,
                     **config['params']
                 }
 
@@ -290,18 +354,26 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                     if not params.get("stream"):
                         params.pop("stream", None)
 
-                with st.status(f"{config['emoji']} 正在思考中...", expanded=False) as status:
+                status_msg = f"{config['emoji']} 思考中..." if st.session_state.thinking_mode else f"{config['emoji']} 回答中..."
+                with st.status(status_msg, expanded=st.session_state.thinking_mode) as status:
                     st.write(f"使用模型: {config['model']}")
+                    st.write(f"模式: {'🧠 思考模式' if st.session_state.thinking_mode else '⚡ 非思考模式'}")
+                    
                     response = client.chat.completions.create(**params)
                     answer = response.choices[0].message.content
 
                     if hasattr(response, 'usage') and response.usage is not None:
                         st.write(f"Tokens: {response.usage.total_tokens}")
-                    status.update(label=f"{config['emoji']} 完成！", state="complete")
+                    
+                    status_label = f"{config['emoji']} 思考完成！" if st.session_state.thinking_mode else f"{config['emoji']} 回答完成！"
+                    status.update(label=status_label, state="complete")
 
-                # ✅ 统一在此处显示
                 st.markdown(answer)
-                st.session_state.model_responses[model_id] = {"answer": answer, "model": config['model']}
+                st.session_state.model_responses[model_id] = {
+                    "answer": answer, 
+                    "model": config['model'],
+                    "mode": "thinking" if st.session_state.thinking_mode else "direct"
+                }
                 return answer
 
         except Exception as e:
@@ -318,6 +390,10 @@ if prompt := st.chat_input("向AI模型提问..."):
     if not enabled_model_ids:
         st.warning("⚠️ 请至少启用一个模型")
         st.stop()
+    
+    # 显示当前模式状态
+    mode_status = "🧠 思考模式" if st.session_state.thinking_mode else "⚡ 非思考模式"
+    st.info(f"当前模式: {mode_status} | 正在同步调用 {len(enabled_model_ids)} 个模型...")
     
     cols = st.columns(len(enabled_model_ids))
     with st.spinner(f"正在同步调用 {len(enabled_model_ids)} 个模型..."):
@@ -338,4 +414,16 @@ if prompt := st.chat_input("向AI模型提问..."):
 
 # 8. 底部信息
 st.sidebar.write("---")
-st.sidebar.caption("🔄 版本 V8.1 | 所有模型回答直接显示 | Mistral & Kimi 已修复")
+st.sidebar.caption("🔄 版本 V8.2 | 支持思考/非思考模式切换 | 默认思考模式")
+st.sidebar.write("### 模式说明")
+st.sidebar.info("""
+**🧠 思考模式**
+- 展示详细推理过程
+- 适合复杂问题、数学计算、逻辑分析
+- 响应时间稍长
+
+**⚡ 非思考模式**
+- 直接给出答案
+- 响应速度更快
+- 适合简单问答、快速查询
+""")
