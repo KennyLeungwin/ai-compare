@@ -10,7 +10,7 @@ st.set_page_config(
     layout="wide",
     page_icon="🤖"
 )
-st.title("🧠 六模型聊天对比 (V8.0 统一UI版)")
+st.title("🧠 六模型聊天对比 (V8.1 统一UI版)")
 
 # 2. 模型配置信息（新增 Mistral）
 MODEL_CONFIG = {
