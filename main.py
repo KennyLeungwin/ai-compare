@@ -230,18 +230,17 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                 base_url=config['base_url']
             )
             
-            # ========== Kimi K2.5 修复点1：强制走非流式，格式与其他模型完全一致 ==========
+            # ========== Kimi K2.5 ==========
             if model_id == "kimi" and st.session_state.get("kimi_k25_enabled", True):
                 params = {
                     "model": "kimi-k2.5",
                     "messages": messages,
                     "max_tokens": 32768,
-                    "stream": False,  # ← 强制关闭流式，保证UI结构一致
+                    "stream": False,
                     "temperature": 1.0
                 }
                 st.caption("🌙 Kimi K2.5 | 温度: 1 (固定) | 32k 输出")
                 
-                # 直接走非流式逻辑（与其他模型完全相同结构）
                 with st.status("🌙 Kimi 思考中...", expanded=False) as status:
                     st.write("使用模型: kimi-k2.5")
                     response = client.chat.completions.create(**params)
@@ -251,15 +250,17 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                         st.write(f"Tokens: {response.usage.total_tokens}")
                     status.update(label="✅ 完成！", state="complete")
                 
-                # 仅保存，不显示！返回 answer 供主流程使用
+                # ✅ 关键修复：在这里直接显示 answer！
+                st.markdown(answer)
+                
                 st.session_state.model_responses[model_id] = {
                     "answer": answer, 
                     "model": "kimi-k2.5",
                     "temperature": 1
                 }
-                return answer  # ← 关键：必须返回！
+                return answer
             
-            # ========== 其他模型（修复点2：确保每个分支都有 return answer）==========
+            # ========== 其他模型 ==========
             params = {
                 "model": config['model'],
                 "messages": messages,
@@ -282,7 +283,7 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                 if not params.get("stream"):
                     params.pop("stream", None)
 
-            # 调用 API（所有模型统一结构）
+            # 调用 API
             with st.status(f"{config['emoji']} 正在思考中...", expanded=False) as status:
                 st.write(f"使用模型: {config['model']}")
                 response = client.chat.completions.create(**params)
@@ -292,9 +293,11 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                     st.write(f"Tokens: {response.usage.total_tokens}")
                 status.update(label=f"{config['emoji']} 完成！", state="complete")
 
-            # 仅保存，不显示！返回 answer 供主流程使用
+            # ✅ 关键修复：在这里直接显示 answer！
+            st.markdown(answer)
+            
             st.session_state.model_responses[model_id] = {"answer": answer, "model": config['model']}
-            return answer  # ← 关键：必须返回！（之前误删导致不显示）
+            return answer
 
         except Exception as e:
             st.error(f"调用失败: {str(e)[:200]}")
