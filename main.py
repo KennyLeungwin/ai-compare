@@ -125,24 +125,30 @@ MODEL_CONFIG = {
     }
 }
 
-# 3. 初始化会话状态
+# 3. 初始化会话状态（修复：添加所有需要的状态变量）
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "enable_qwen_search" not in st.session_state:
     st.session_state.enable_qwen_search = False
 if "kimi_k25_enabled" not in st.session_state:
     st.session_state.kimi_k25_enabled = True
+if "kimi_thinking_enabled" not in st.session_state:  # 修复：添加这个状态变量
+    st.session_state.kimi_thinking_enabled = True
+if "thinking_mode" not in st.session_state:  # 修复：确保这个状态变量存在
+    st.session_state.thinking_mode = True
 # 【DeepSeek优化】新增DeepSeek专属状态
 if "deepseek_style" not in st.session_state:
     st.session_state.deepseek_style = "detailed"
 if "deepseek_thinking_enabled" not in st.session_state:
     st.session_state.deepseek_thinking_enabled = True
-# 新增：DeepSeek推理模式配置
 if "deepseek_reasoning_level" not in st.session_state:
     st.session_state.deepseek_reasoning_level = "medium"
-# 新增：DeepSeek实时网络搜索
 if "deepsearch_enabled" not in st.session_state:
     st.session_state.deepsearch_enabled = False
+if "math_mode" not in st.session_state:  # 修复：添加math_mode状态变量
+    st.session_state.math_mode = False
+if "show_token_usage" not in st.session_state:  # 修复：添加show_token_usage状态变量
+    st.session_state.show_token_usage = True
 
 # 4. 侧边栏 UI (完整回归)
 with st.sidebar:
@@ -212,23 +218,21 @@ with st.sidebar:
             # 数学专用模式
             st.session_state.math_mode = st.toggle(
                 "数学专用模式",
-                value=False,
+                value=st.session_state.math_mode,
                 help="针对数学问题优化，增强计算精度和步骤展示"
             )
             
             # Token使用监控
-            show_token_usage = st.toggle(
+            st.session_state.show_token_usage = st.toggle(
                 "显示Token使用详情",
-                value=True,
+                value=st.session_state.show_token_usage,
                 help="显示详细的Token使用统计"
             )
     
     # 高级设置（不再包含DeepSeek专属设置）
     with st.expander("高级设置"):
         st.subheader("🧠 思考模式")
-        thinking_mode = st.toggle("启用全局思考模式", value=True, help="思考模式会显式引导模型进行逻辑推理")
-        
-        # 这里不再包含DeepSeek的配置，已经移到上面了
+        st.session_state.thinking_mode = st.toggle("启用全局思考模式", value=st.session_state.thinking_mode, help="思考模式会显式引导模型进行逻辑推理")
         
         # 全局温度设置
         global_temp = st.slider("全局温度", 0.0, 1.0, 0.7)
@@ -263,6 +267,7 @@ with st.sidebar:
     if st.button("🗑️ 清空所有对话", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
+
 # 5. 辅助函数：隔离记忆
 def get_isolated_messages(model_id, current_prompt):
     cfg = MODEL_CONFIG[model_id]
@@ -271,7 +276,7 @@ def get_isolated_messages(model_id, current_prompt):
     prompt_to_send = current_prompt
     
     # 【DeepSeek优化】增强的思考提示
-    if model_id == "deepseek" and thinking_mode:
+    if model_id == "deepseek" and st.session_state.thinking_mode:
         thinking_prompt = "\n\n【DeepSeek推理模式】\n"
         
         if st.session_state.deepseek_style == "detailed":
@@ -320,7 +325,7 @@ def get_isolated_messages(model_id, current_prompt):
         prompt_to_send += thinking_prompt
     
     # 【Kimi优化】新增Kimi专属思考提示
-    elif model_id == "kimi" and thinking_mode:
+    elif model_id == "kimi" and st.session_state.thinking_mode:
         thinking_prompt = "\n\n【深度思考模式】\n"
         
         if any(kw in current_prompt for kw in ["代码", "编程", "debug", "code", "函数", "算法"]):
@@ -362,7 +367,7 @@ def get_isolated_messages(model_id, current_prompt):
         prompt_to_send += thinking_prompt
     
     # 其他模型的思考模式
-    elif thinking_mode and model_id not in ["deepseek", "kimi"]:
+    elif st.session_state.thinking_mode and model_id not in ["deepseek", "kimi"]:
         prompt_to_send += "\n\n请详细展示你的思考步骤，然后再给出最终回答。"
 
     for m in st.session_state.messages:
@@ -433,7 +438,7 @@ if prompt := st.chat_input("向选中的 AI 模型提问..."):
                             params["stream"] = True
                     
                     # 【Kimi优化】Kimi专属参数处理
-                    elif mid == "kimi":
+                    if mid == "kimi":
                         # 强制锁定官方推荐参数
                         params["temperature"] = 1.0
                         params["top_p"] = 0.95
@@ -456,13 +461,13 @@ if prompt := st.chat_input("向选中的 AI 模型提问..."):
 
                     # 状态显示优化
                     if mid == "deepseek":
-                        status_text = "🚀 DeepSeek深度推理中..." if thinking_mode else "🚀 DeepSeek回答中..."
+                        status_text = "🚀 DeepSeek深度推理中..." if st.session_state.thinking_mode else "🚀 DeepSeek回答中..."
                         if st.session_state.deepsearch_enabled:
                             status_text = "🌐 DeepSeek联网搜索中..."
                     elif mid == "kimi":
                         status_text = "🌙 Kimi深度思考中..." if st.session_state.kimi_thinking_enabled else "🌙 Kimi回答中..."
                     else:
-                        status_text = f"{cfg['emoji']} 思考中..." if thinking_mode else f"{cfg['emoji']} 回答中..."
+                        status_text = f"{cfg['emoji']} 思考中..." if st.session_state.thinking_mode else f"{cfg['emoji']} 回答中..."
                     
                     usage_info = None
                     reasoning_content = None
@@ -485,7 +490,7 @@ if prompt := st.chat_input("向选中的 AI 模型提问..."):
                         
                         # 更新状态
                         if mid == "deepseek":
-                            label = "✅ DeepSeek推理完成" if thinking_mode else "✅ DeepSeek回答完成"
+                            label = "✅ DeepSeek推理完成" if st.session_state.thinking_mode else "✅ DeepSeek回答完成"
                             if st.session_state.deepsearch_enabled:
                                 label = "✅ DeepSeek联网搜索完成"
                             status.update(label=label, state="complete")
@@ -500,7 +505,7 @@ if prompt := st.chat_input("向选中的 AI 模型提问..."):
                     
                     # 【DeepSeek优化】增强的资源展示
                     if mid == "deepseek" and usage_info:
-                        with st.expander("📊 DeepSeek推理资源详情", expanded=show_token_usage):
+                        with st.expander("📊 DeepSeek推理资源详情", expanded=st.session_state.show_token_usage):
                             cols_usage = st.columns(4)
                             with cols_usage[0]:
                                 st.metric("总Tokens", usage_info.total_tokens)
