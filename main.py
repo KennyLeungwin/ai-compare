@@ -295,13 +295,22 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                 return answer
             
             # ========== Mistral AI ==========
-            elif model_id == "mistral":
-                # ===== 强制身份锚定 =====
+               elif model_id == "mistral":
+            
+                # ===== 精准身份锚定 =====
                 mistral_system = {
                     "role": "system",
-                    "content": "You are an AI assistant. Do NOT mention DeepSeek, GPT, Qwen, Gemini, Kimi, or your model name."
+                    "content": """
+            You are Mistral AI's assistant.
+            You must NOT claim to be DeepSeek, OpenAI, Qwen, Gemini, or Kimi.
+            You MAY say you are from Mistral AI.
+            Do not copy other models' responses.
+            """
                 }
-                mistral_messages = [mistral_system] + (current_messages if st.session_state.thinking_mode else messages)
+            
+                # Mistral 不读取参考回答
+                mistral_clean_messages = [m for m in messages if "[参考回答" not in m["content"]]
+                mistral_messages = [mistral_system] + (current_messages if st.session_state.thinking_mode else mistral_clean_messages)
             
                 params = {
                     "model": config["model"],
@@ -311,26 +320,12 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                     "stream": False
                 }
             
-                # 动态温度调整
-                last_user_msg = next((msg["content"] for msg in reversed(messages) if msg["role"] == "user"), "")
-                if "代码" in last_user_msg or "program" in last_user_msg.lower():
-                    params["temperature"] = 0.3
-                elif "创意" in last_user_msg or "story" in last_user_msg.lower():
-                    params["temperature"] = 0.9
-            
-                status_msg = "🦉 Mistral 思考中..." if st.session_state.thinking_mode else "🦉 Mistral 回答中..."
-                with st.status(status_msg, expanded=st.session_state.thinking_mode) as status:
-                    response = client.chat.completions.create(**params)
-                    answer = response.choices[0].message.content
-            
-                    # ===== 身份清洗 =====
-                    for bad in ["DeepSeek", "GPT", "Qwen", "Gemini", "Kimi", "Mistral"]:
-                        answer = answer.replace(bad, "AI assistant")
-            
-                    status.update(label="✅ 完成", state="complete")
+                response = client.chat.completions.create(**params)
+                answer = response.choices[0].message.content
             
                 st.markdown(answer)
                 return answer
+            
 
 
             # ========== 其他模型 ==========
