@@ -296,42 +296,42 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
             
             # ========== Mistral AI ==========
             elif model_id == "mistral":
+                # ===== 强制身份锚定 =====
+                mistral_system = {
+                    "role": "system",
+                    "content": "You are an AI assistant. Do NOT mention DeepSeek, GPT, Qwen, Gemini, Kimi, or your model name."
+                }
+                mistral_messages = [mistral_system] + (current_messages if st.session_state.thinking_mode else messages)
+            
                 params = {
                     "model": config["model"],
-                    "messages": current_messages if st.session_state.thinking_mode else messages,
+                    "messages": mistral_messages,
                     "temperature": config["params"]["temperature"],
                     "max_tokens": config["params"]["max_tokens"],
                     "stream": False
                 }
-
-                # 动态调整温度
+            
+                # 动态温度调整
                 last_user_msg = next((msg["content"] for msg in reversed(messages) if msg["role"] == "user"), "")
                 if "代码" in last_user_msg or "program" in last_user_msg.lower():
                     params["temperature"] = 0.3
                 elif "创意" in last_user_msg or "story" in last_user_msg.lower():
                     params["temperature"] = 0.9
-
+            
                 status_msg = "🦉 Mistral 思考中..." if st.session_state.thinking_mode else "🦉 Mistral 回答中..."
                 with st.status(status_msg, expanded=st.session_state.thinking_mode) as status:
-                    st.write(f"使用模型: {config['model']}")
-                    st.write(f"模式: {'🧠 思考模式' if st.session_state.thinking_mode else '⚡ 非思考模式'}")
-                    
                     response = client.chat.completions.create(**params)
                     answer = response.choices[0].message.content
-
-                    if hasattr(response, 'usage') and response.usage is not None:
-                        st.write(f"Tokens: {response.usage.total_tokens}")
-                    
-                    status_label = "✅ 思考完成！" if st.session_state.thinking_mode else "✅ 回答完成！"
-                    status.update(label=status_label, state="complete")
-
+            
+                    # ===== 身份清洗 =====
+                    for bad in ["DeepSeek", "GPT", "Qwen", "Gemini", "Kimi", "Mistral"]:
+                        answer = answer.replace(bad, "AI assistant")
+            
+                    status.update(label="✅ 完成", state="complete")
+            
                 st.markdown(answer)
-                st.session_state.model_responses[model_id] = {
-                    "answer": answer, 
-                    "model": config["model"],
-                    "mode": "thinking" if st.session_state.thinking_mode else "direct"
-                }
                 return answer
+
 
             # ========== 其他模型 ==========
             else:
