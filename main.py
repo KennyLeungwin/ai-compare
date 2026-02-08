@@ -295,7 +295,7 @@ def ask_ai(model_id: str, col_obj, messages: list) -> Optional[str]:
                 return answer
             
             # ========== Mistral AI ==========
-               elif model_id == "mistral":
+            elif model_id == "mistral":
             
                 # ===== 精准身份锚定 =====
                 mistral_system = {
