@@ -3,8 +3,8 @@ import os
 from openai import OpenAI
 
 # 1. 页面配置
-st.set_page_config(page_title="AI Arena v11.0", layout="wide", page_icon="🧬")
-st.title("🧬 AI Arena v11.0 (局部渲染增强版)")
+st.set_page_config(page_title="AI Arena v12.0", layout="wide", page_icon="🧬")
+st.title("🧬 AI Arena v12.0 (自动持久化版)")
 
 # 2. 模型配置
 MODEL_CONFIG = {
@@ -29,7 +29,7 @@ MODEL_CONFIG = {
         "system": "你是通义千问。", "params": {"max_tokens": 4096}
     },
     "mistral": {
-        "name": "Mistral Large", "model": "mistral-large-latest", "emoji": "Owl",
+        "name": "Mistral Large", "model": "mistral-large-latest", "emoji": "🦉",
         "base_url": "https://api.mistral.ai/v1", "env_key": "MISTRAL_API_KEY",
         "system": "You are Mistral Large.", "params": {"max_tokens": 4096}
     }
@@ -38,82 +38,87 @@ MODEL_CONFIG = {
 # 3. 状态初始化
 if "messages" not in st.session_state:
     st.session_state.messages = []
-if "temp_dict" not in st.session_state:
-    st.session_state.temp_dict = {}
 
 # 4. 侧边栏
 with st.sidebar:
     st.header("⚙️ 设置")
+    # 使用 set 记录选中的模型
     active_ids = [mid for mid in MODEL_CONFIG if st.checkbox(f"{MODEL_CONFIG[mid]['emoji']} {MODEL_CONFIG[mid]['name']}", value=True, key=f"sel_{mid}")]
-    global_temp = st.slider("温度控制", 0.0, 1.0, 0.7)
-    if st.button("🗑️ 清空记录", use_container_width=True):
+    global_temp = st.slider("温度控制 (Kimi除外)", 0.0, 1.0, 0.7)
+    if st.button("🗑️ 清空所有对话", use_container_width=True):
         st.session_state.messages = []
-        st.session_state.temp_dict = {}
         st.rerun()
 
-# 5. 核心推理组件 (使用 fragment 隔离渲染)
-@st.fragment
-def model_container(mid, col_obj, user_input):
-    cfg = MODEL_CONFIG[mid]
-    api_key = os.getenv(cfg['env_key'])
-    
-    with col_obj:
-        st.subheader(f"{cfg['emoji']} {cfg['name']}")
-        if not api_key:
-            st.error("API Key Missing")
-            return
+# 5. 辅助函数：消息隔离过滤
+def get_isolated_messages(model_id, current_prompt):
+    cfg = MODEL_CONFIG[model_id]
+    msgs = [{"role": "system", "content": cfg['system']}]
+    for m in st.session_state.messages:
+        if m["role"] == "user":
+            msgs.append({"role": "user", "content": m["content"]})
+        elif m["role"] == "assistant" and m.get("model_id") == model_id:
+            # 去除显示标签
+            content = m["content"].split("]: ", 1)[-1] if "]: " in m["content"] else m["content"]
+            msgs.append({"role": "assistant", "content": content})
+    msgs.append({"role": "user", "content": current_prompt})
+    return msgs
 
-        try:
-            client = OpenAI(api_key=api_key, base_url=cfg['base_url'])
-            
-            # 记忆隔离过滤
-            msgs = [{"role": "system", "content": cfg['system']}]
-            for m in st.session_state.messages:
-                if m["role"] == "user":
-                    msgs.append({"role": "user", "content": m["content"]})
-                elif m["role"] == "assistant" and m.get("model_id") == mid:
-                    msgs.append({"role": "assistant", "content": m["content"]})
-            
-            # 加上当前这一条
-            msgs.append({"role": "user", "content": user_input})
-
-            # 参数适配
-            p = cfg['params'].copy()
-            p["temperature"] = 1.0 if mid == "kimi" else global_temp
-
-            with st.spinner(f"{cfg['name']} 正在思考..."):
-                resp = client.chat.completions.create(model=cfg['model'], messages=msgs, **p)
-                ans = resp.choices[0].message.content
-                st.markdown(ans)
-                
-                # 存入临时缓存，避免立即刷新导致冲突
-                st.session_state.temp_dict[mid] = ans
-        except Exception as e:
-            st.error(f"Error: {str(e)}")
-
-# 6. 界面渲染
-# 渲染历史
+# 6. 界面渲染逻辑
+# 首先渲染历史对话
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+        # 仅显示纯文本给用户看
+        display_content = msg["content"].split("]: ", 1)[-1] if "]: " in msg["content"] else msg["content"]
+        st.markdown(display_content)
 
-# 输入处理
-if prompt := st.chat_input("输入问题..."):
-    # 立即渲染用户提问
+# 处理用户输入
+if prompt := st.chat_input("向所有模型提问..."):
+    # 1. 立即显示用户的问题
     with st.chat_message("user"):
         st.markdown(prompt)
     
-    # 启动多模型容器
+    # 2. 准备并行显示的列
     if active_ids:
         cols = st.columns(len(active_ids))
-        for i, mid in enumerate(active_ids):
-            model_container(mid, cols[i], prompt)
+        new_responses = [] # 用于临时存放结果
         
-        # 此时所有模型已在各自的 fragment 中渲染完成
-        # 如果需要持久化记录，可以在这里手动同步
-        if st.button("💾 保存本次对话到历史"):
+        for i, mid in enumerate(active_ids):
+            cfg = MODEL_CONFIG[mid]
+            with cols[i]:
+                st.subheader(f"{cfg['emoji']} {cfg['name']}")
+                api_key = os.getenv(cfg['env_key'])
+                if not api_key:
+                    st.error("Missing Key")
+                    continue
+                
+                try:
+                    client = OpenAI(api_key=api_key, base_url=cfg['base_url'])
+                    p = cfg['params'].copy()
+                    p["temperature"] = 1.0 if mid == "kimi" else global_temp
+                    
+                    with st.spinner("思考中..."):
+                        resp = client.chat.completions.create(
+                            model=cfg['model'],
+                            messages=get_isolated_messages(mid, prompt),
+                            **p
+                        )
+                        ans = resp.choices[0].message.content
+                        st.markdown(ans)
+                        # 记录到临时列表
+                        new_responses.append({"mid": mid, "ans": ans})
+                except Exception as e:
+                    st.error(f"失败: {str(e)}")
+
+        # 3. 核心改进：所有模型跑完后，一次性存入 session_state 并静默处理
+        if new_responses:
+            # 先存用户问题
             st.session_state.messages.append({"role": "user", "content": prompt})
-            for mid, ans in st.session_state.temp_dict.items():
-                st.session_state.messages.append({"role": "assistant", "content": ans, "model_id": mid})
-            st.session_state.temp_dict = {}
-            st.rerun()
+            # 再存每个模型的回答
+            for item in new_responses:
+                st.session_state.messages.append({
+                    "role": "assistant", 
+                    "content": f"[{MODEL_CONFIG[item['mid']]['name']}]: {item['ans']}",
+                    "model_id": item['mid']
+                })
+            # 这里不使用 st.rerun()，以保持 Mistral 的渲染状态不被强行切断
+            # 下一次输入时，历史记录会自动渲染出来的
