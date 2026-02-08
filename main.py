@@ -40,7 +40,15 @@ MODEL_CONFIG = {
     "qwen": {
         "name": "通义千问 Max", "model": "qwen-max", "emoji": "🌸",
         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "web_url": "https://www.qianwen.com/",
-        "env_key": "QWEN_API_KEY", "system": "你是通义千问。",
+        "env_key": "QWEN_API_KEY",
+        "system": (
+            "You are Qwen-Max, a large-scale language model developed by Tongyi Lab. "
+            "You excel at reasoning, coding, multi-language understanding (including Chinese, English, and more), "
+            "and answering questions accurately based on your knowledge or real-time web search when enabled. "
+            "Respond in the same language as the user's query unless instructed otherwise. "
+            "If web search is enabled, use up-to-date information and cite sources when possible. "
+            "Be clear, concise, helpful, and professional."
+        ),
         "params": {"temperature": 0.7, "max_tokens": 4096}
     },
     "mistral": {
