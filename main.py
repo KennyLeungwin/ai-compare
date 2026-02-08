@@ -122,7 +122,7 @@ MODEL_CONFIG = {
             "max_tokens": 8192,
             "stream": False,
         }
-    }
+    } }
 
 
 # 3. 初始化会话状态
