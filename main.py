@@ -282,6 +282,7 @@ if prompt := st.chat_input("向选中的 AI 模型提问..."):
                     else:
                         status_text = f"{cfg['emoji']} 思考中..." if st.session_state.thinking_mode else f"{cfg['emoji']} 回答中..."
                     
+                    usage_info = None
                     with st.status(status_text) as status:
                         # DeepSeek在思考模式下展示推理过程
                         resp = client.chat.completions.create(
@@ -290,21 +291,33 @@ if prompt := st.chat_input("向选中的 AI 模型提问..."):
                             **params
                         )
                         ans = resp.choices[0].message.content
-                        st.markdown(ans)
                         
-                        # DeepSeek专属：显示推理资源使用信息
+                        # 保存使用信息，稍后显示
                         if mid == "deepseek" and hasattr(resp, 'usage'):
-                            with st.expander("🧠 推理资源使用", expanded=False):
-                                st.write(f"总Tokens: {resp.usage.total_tokens}")
-                                if hasattr(resp.usage, 'completion_tokens'):
-                                    st.write(f"生成Tokens: {resp.usage.completion_tokens}")
-                                if hasattr(resp.usage, 'prompt_tokens'):
-                                    st.write(f"提示Tokens: {resp.usage.prompt_tokens}")
+                            usage_info = resp.usage
                         
+                        # 先更新状态，然后显示答案
                         if mid == "deepseek":
                             status.update(label=f"✅ DeepSeek推理完成" if st.session_state.thinking_mode else f"✅ DeepSeek回答完成", state="complete")
                         else:
                             status.update(label=f"✅ {cfg['name']} 完成", state="complete")
+                    
+                    # 在status块外部显示答案和扩展信息
+                    st.markdown(ans)
+                    
+                    # DeepSeek专属：显示推理资源使用信息（在status块外部）
+                    if mid == "deepseek" and usage_info:
+                        # 使用st.info或st.caption而不是expander来避免嵌套问题
+                        st.caption("🧠 推理资源使用:")
+                        cols_usage = st.columns(3)
+                        with cols_usage[0]:
+                            st.metric("总Tokens", usage_info.total_tokens)
+                        if hasattr(usage_info, 'completion_tokens'):
+                            with cols_usage[1]:
+                                st.metric("生成Tokens", usage_info.completion_tokens)
+                        if hasattr(usage_info, 'prompt_tokens'):
+                            with cols_usage[2]:
+                                st.metric("提示Tokens", usage_info.prompt_tokens)
                     
                     new_responses.append({"mid": mid, "ans": ans})
                     
@@ -312,14 +325,14 @@ if prompt := st.chat_input("向选中的 AI 模型提问..."):
                     if mid == "deepseek":
                         # 为DeepSeek提供更详细的错误信息
                         st.error(f"DeepSeek调用失败: {str(e)[:150]}")
-                        with st.expander("DeepSeek专属排查建议"):
-                            st.write("""
-                            DeepSeek API 常见问题排查：
-                            1. 检查API密钥是否在 https://platform.deepseek.com/api_keys 创建
-                            2. 确认账户余额充足（新用户有免费额度）
-                            3. 推理模型需要指定 reasoning_effort 参数
-                            4. 检查网络连接，特别是国际网络访问
-                            """)
+                        # 使用st.info而不是expander来避免嵌套问题
+                        st.info("""
+                        **DeepSeek专属排查建议:**
+                        1. 检查API密钥是否在 https://platform.deepseek.com/api_keys 创建
+                        2. 确认账户余额充足（新用户有免费额度）
+                        3. 推理模型需要指定 reasoning_effort 参数
+                        4. 检查网络连接，特别是国际网络访问
+                        """)
                     else:
                         st.error(f"调用失败: {str(e)[:100]}")
 
