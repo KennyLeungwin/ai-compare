@@ -110,32 +110,44 @@ with st.sidebar:
         st.subheader("🧠 思考模式")
         st.session_state.thinking_mode = st.toggle("启用思考模式", value=st.session_state.thinking_mode, help="思考模式会显式引导模型进行逻辑推理")
         
-        # DeepSeek专属推理强度配置
+        # 修复：简化DeepSeek推理强度配置
         reasoning_level = st.select_slider(
             "DeepSeek 推理强度", 
-            options=[("low", "轻度推理 - 快速响应"), ("medium", "平衡模式 - 推荐"), ("high", "深度推理 - 最准确")],
+            options=["low", "medium", "high"],
             value="medium",
-            format_func=lambda x: x[1] if isinstance(x, tuple) else x
+            format_func=lambda x: {
+                "low": "轻度推理 - 快速响应",
+                "medium": "平衡模式 - 推荐", 
+                "high": "深度推理 - 最准确"
+            }.get(x, x)
         )
-        if isinstance(reasoning_level, tuple):
-            reasoning_level = reasoning_level[0]
         MODEL_CONFIG["deepseek"]["params"]["reasoning_effort"] = reasoning_level
         
         # 为DeepSeek添加回答风格选项
-        st.session_state.deepseek_style = st.selectbox(
+        # 简化选项列表，避免复杂的元组结构
+        style_options = ["detailed", "concise", "technical", "educational"]
+        style_labels = {
+            "detailed": "详细模式 - 展示完整推理过程",
+            "concise": "简洁模式 - 直接给出答案",
+            "technical": "技术模式 - 专业术语和详细分析",
+            "educational": "教育模式 - 分步讲解，适合学习"
+        }
+        
+        # 获取当前样式的索引
+        current_index = style_options.index(st.session_state.deepseek_style) if st.session_state.deepseek_style in style_options else 0
+        
+        selected_label = st.selectbox(
             "DeepSeek回答风格",
-            options=[
-                ("detailed", "详细模式 - 展示完整推理过程"),
-                ("concise", "简洁模式 - 直接给出答案"),
-                ("technical", "技术模式 - 专业术语和详细分析"),
-                ("educational", "教育模式 - 分步讲解，适合学习")
-            ],
-            format_func=lambda x: x[1],
-            key="deepseek_style_select",
-            index=0 if st.session_state.deepseek_style == "detailed" else 
-                  1 if st.session_state.deepseek_style == "concise" else
-                  2 if st.session_state.deepseek_style == "technical" else 3
-        )[0]
+            options=[style_labels[opt] for opt in style_options],
+            index=current_index,
+            key="deepseek_style_select"
+        )
+        
+        # 根据选中的标签找到对应的键
+        for key, label in style_labels.items():
+            if label == selected_label:
+                st.session_state.deepseek_style = key
+                break
 
         global_temp = st.slider("全局温度", 0.0, 1.0, 0.7)
         for mid in MODEL_CONFIG:
