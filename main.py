@@ -2,6 +2,9 @@ import streamlit as st
 import os
 from openai import OpenAI
 from typing import Optional
+import streamlit.components.v1 as components
+import uuid
+import json
 
 # 1. 页面配置
 st.set_page_config(
@@ -149,7 +152,184 @@ if "math_mode" not in st.session_state:
 if "show_token_usage" not in st.session_state:
     st.session_state.show_token_usage = True
 
-# 4. 侧边栏 UI (完整回归)
+# 4. 通用复制按钮函数（安全、带反馈）
+def copy_button(text: str, key: str, label: str = "📋 复制"):
+    """
+    真·复制到系统剪贴板（浏览器 navigator.clipboard）。
+    key 必须唯一，否则组件会互相干扰。
+    """
+    btn_id = f"copy_btn_{key}"
+    msg_id = f"copy_msg_{key}"
+
+    # 用 json.dumps 生成安全的 JS 字符串字面量（比 html.escape 稳得多）
+    js_text = json.dumps(text or "")
+
+    components.html(
+        f"""
+        <div style="display:flex; align-items:center; gap:10px; margin:6px 0 14px 0;">
+          <button id="{btn_id}"
+            style="
+              padding:6px 10px;
+              border-radius:8px;
+              border:1px solid rgba(49,51,63,0.2);
+              background: white;
+              cursor: pointer;
+              font-size: 14px;
+            "
+          >{label}</button>
+          <span id="{msg_id}" style="font-size:12px; opacity:0.7;"></span>
+        </div>
+
+        <script>
+          (function() {{
+            const btn = document.getElementById("{btn_id}");
+            const msg = document.getElementById("{msg_id}");
+            const text = {js_text};
+
+            if (!btn) return;
+
+            btn.addEventListener("click", async () => {{
+              try {{
+                await navigator.clipboard.writeText(text);
+                msg.textContent = "✅ 已复制";
+                setTimeout(() => msg.textContent = "", 1200);
+              }} catch (e) {{
+                msg.textContent = "❌ 复制失败（权限/非HTTPS/iframe限制）";
+              }}
+            }});
+          }})();
+        </script>
+        """,
+        height=45,
+    )
+
+# 5. 辅助函数：隔离记忆
+def get_isolated_messages(model_id, current_prompt):
+    cfg = MODEL_CONFIG[model_id]
+    msgs = [{"role": "system", "content": cfg['system']}]
+    
+    prompt_to_send = current_prompt
+    if st.session_state.thinking_mode:
+        if model_id == "deepseek":
+            thinking_prompt = "\n\n【请使用Chain-of-Thought逐步推理】\n"
+            
+            if st.session_state.deepseek_style == "detailed":
+                thinking_prompt += (
+                    "第一步：理解问题核心和约束条件\n"
+                    "第二步：拆解问题，分析关键要素\n"
+                    "第三步：逻辑推导，展示推理链条\n"
+                    "第四步：验证结果，确保逻辑一致性\n"
+                    "第五步：给出清晰、准确的最终答案\n"
+                    "（如果涉及数学计算，请展示详细计算过程）"
+                )
+            elif st.session_state.deepseek_style == "technical":
+                thinking_prompt += (
+                    "1. 问题分析：识别核心问题和约束条件\n"
+                    "2. 方法论选择：确定适用的分析方法\n"
+                    "3. 逐步推导：展示严谨的逻辑推导过程\n"
+                    "4. 结果验证：检查推导的合理性和一致性\n"
+                    "5. 结论：给出准确的技术性结论"
+                )
+            elif st.session_state.deepseek_style == "educational":
+                thinking_prompt += (
+                    "📚 教学式思考：\n"
+                    "• 首先，让我们理解这个问题在问什么\n"
+                    "• 其次，我们一步步分析解决思路\n"
+                    "• 然后，详细展示每个步骤的原理\n"
+                    "• 最后，总结知识点和关键结论\n"
+                    "（请用通俗易懂的方式讲解）"
+                )
+            elif st.session_state.deepseek_style == "concise":
+                thinking_prompt = "\n\n请直接给出最准确的答案。"
+            elif st.session_state.deepseek_style == "creative":
+                thinking_prompt += (
+                    "✨ 请展现创意和想象力：\n"
+                    "• 不拘泥于常规思维路径\n"
+                    "• 展现独特的视角和见解\n"
+                    "• 语言生动有趣，富有感染力\n"
+                    "• 在合理范围内大胆创新"
+                )
+            else:
+                thinking_prompt = "\n\n请一步步推理并给出最终答案。"
+            
+            # 【DeepSeek优化】数学模式增强
+            if st.session_state.math_mode and any(kw in current_prompt for kw in ["数学", "计算", "方程", "公式", "算", "+", "-", "*", "/", "="]):
+                thinking_prompt += "\n\n【数学模式】请特别注意：\n1. 每个计算步骤都要清晰展示\n2. 使用LaTeX格式表示数学公式\n3. 验证计算结果的合理性\n4. 提供多种解法（如适用）"
+            
+            prompt_to_send += thinking_prompt
+        
+        # 【Kimi优化】新增Kimi专属思考提示
+        elif model_id == "kimi":
+            thinking_prompt = "\n\n【深度思考模式】\n"
+            
+            if any(kw in current_prompt for kw in ["代码", "编程", "debug", "code", "函数", "算法"]):
+                thinking_prompt += (
+                    "请按以下步骤处理编程任务：\n"
+                    "1. 需求解析：明确功能需求、输入输出、边界条件\n"
+                    "2. 方案设计：选择算法和数据结构，说明复杂度\n"
+                    "3. 代码实现：编写完整可运行代码，包含注释\n"
+                    "4. 测试验证：提供测试用例，包括边界情况\n"
+                    "5. 优化建议：指出性能瓶颈和改进方向"
+                )
+            elif any(kw in current_prompt for kw in ["分析", "比较", "为什么", "评估"]):
+                thinking_prompt += (
+                    "请使用结构化分析框架：\n"
+                    "1. 问题拆解：识别核心要素和相互关系\n"
+                    "2. 多角度分析：从技术、业务、用户等维度展开\n"
+                    "3. 证据支撑：引用相关原理、数据或最佳实践\n"
+                    "4. 权衡评估：分析各方案的优缺点\n"
+                    "5. 结论建议：给出明确、可落地的建议"
+                )
+            elif len(current_prompt) > 2000:
+                thinking_prompt += (
+                    "这是一篇长文档，请利用长上下文优势：\n"
+                    "1. 整体把握：先总结核心主题和整体结构\n"
+                    "2. 关键点提取：识别重要论点、数据、结论\n"
+                    "3. 深度解读：对关键部分进行详细分析\n"
+                    "4. 关联整合：将不同部分的信息关联起来"
+                )
+            else:
+                thinking_prompt += (
+                    "请展示思考过程：\n"
+                    "• 理解问题核心诉求\n"
+                    "• 分析关键信息和约束条件\n"
+                    "• 逻辑推导，逐步构建答案\n"
+                    "• 验证结论的准确性和完整性\n"
+                    "• 给出清晰、准确的最终回答"
+                )
+            
+            prompt_to_send += thinking_prompt
+        
+        else:
+            prompt_to_send += "\n\n请详细展示你的思考步骤，然后再给出最终回答。"
+
+    for m in st.session_state.messages:
+        if m["role"] == "user":
+            msgs.append({"role": "user", "content": m["content"]})
+        elif m["role"] == "assistant" and m.get("model_id") == model_id:
+            content = m["content"].split("]: ", 1)[-1] if "]: " in m["content"] else m["content"]
+            msgs.append({"role": "assistant", "content": content})
+    
+    msgs.append({"role": "user", "content": prompt_to_send})
+    return msgs
+
+# 6. 渲染历史消息（支持复制每条助手回答）
+for idx, msg in enumerate(st.session_state.messages):
+    with st.chat_message(msg["role"]):
+        display_content = msg["content"].split("]: ", 1)[-1] if "]: " in msg["content"] else msg["content"]
+        st.markdown(display_content)
+
+        # 仅对助手消息显示复制按钮
+        if msg["role"] == "assistant":
+            mid = msg.get("model_id", "unknown")
+            model_name = MODEL_CONFIG.get(mid, {}).get("name", "Assistant")
+            copy_button(
+                f"[{model_name}]\n\n{display_content}",
+                key=f"hist_{idx}_{mid}",
+                label="📋 复制这条回答"
+            )
+
+# 7. 侧边栏 UI (完整回归)
 with st.sidebar:
     st.header("⚙️ 配置面板")
     
@@ -300,123 +480,7 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
 
-# 5. 辅助函数：隔离记忆
-def get_isolated_messages(model_id, current_prompt):
-    cfg = MODEL_CONFIG[model_id]
-    msgs = [{"role": "system", "content": cfg['system']}]
-    
-    prompt_to_send = current_prompt
-    if st.session_state.thinking_mode:
-        if model_id == "deepseek":
-            thinking_prompt = "\n\n【请使用Chain-of-Thought逐步推理】\n"
-            
-            if st.session_state.deepseek_style == "detailed":
-                thinking_prompt += (
-                    "第一步：理解问题核心和约束条件\n"
-                    "第二步：拆解问题，分析关键要素\n"
-                    "第三步：逻辑推导，展示推理链条\n"
-                    "第四步：验证结果，确保逻辑一致性\n"
-                    "第五步：给出清晰、准确的最终答案\n"
-                    "（如果涉及数学计算，请展示详细计算过程）"
-                )
-            elif st.session_state.deepseek_style == "technical":
-                thinking_prompt += (
-                    "1. 问题分析：识别核心问题和约束条件\n"
-                    "2. 方法论选择：确定适用的分析方法\n"
-                    "3. 逐步推导：展示严谨的逻辑推导过程\n"
-                    "4. 结果验证：检查推导的合理性和一致性\n"
-                    "5. 结论：给出准确的技术性结论"
-                )
-            elif st.session_state.deepseek_style == "educational":
-                thinking_prompt += (
-                    "📚 教学式思考：\n"
-                    "• 首先，让我们理解这个问题在问什么\n"
-                    "• 其次，我们一步步分析解决思路\n"
-                    "• 然后，详细展示每个步骤的原理\n"
-                    "• 最后，总结知识点和关键结论\n"
-                    "（请用通俗易懂的方式讲解）"
-                )
-            elif st.session_state.deepseek_style == "concise":
-                thinking_prompt = "\n\n请直接给出最准确的答案。"
-            elif st.session_state.deepseek_style == "creative":
-                thinking_prompt += (
-                    "✨ 请展现创意和想象力：\n"
-                    "• 不拘泥于常规思维路径\n"
-                    "• 展现独特的视角和见解\n"
-                    "• 语言生动有趣，富有感染力\n"
-                    "• 在合理范围内大胆创新"
-                )
-            else:
-                thinking_prompt = "\n\n请一步步推理并给出最终答案。"
-            
-            # 【DeepSeek优化】数学模式增强
-            if st.session_state.math_mode and any(kw in current_prompt for kw in ["数学", "计算", "方程", "公式", "算", "+", "-", "*", "/", "="]):
-                thinking_prompt += "\n\n【数学模式】请特别注意：\n1. 每个计算步骤都要清晰展示\n2. 使用LaTeX格式表示数学公式\n3. 验证计算结果的合理性\n4. 提供多种解法（如适用）"
-            
-            prompt_to_send += thinking_prompt
-        
-        # 【Kimi优化】新增Kimi专属思考提示
-        elif model_id == "kimi":
-            thinking_prompt = "\n\n【深度思考模式】\n"
-            
-            if any(kw in current_prompt for kw in ["代码", "编程", "debug", "code", "函数", "算法"]):
-                thinking_prompt += (
-                    "请按以下步骤处理编程任务：\n"
-                    "1. 需求解析：明确功能需求、输入输出、边界条件\n"
-                    "2. 方案设计：选择算法和数据结构，说明复杂度\n"
-                    "3. 代码实现：编写完整可运行代码，包含注释\n"
-                    "4. 测试验证：提供测试用例，包括边界情况\n"
-                    "5. 优化建议：指出性能瓶颈和改进方向"
-                )
-            elif any(kw in current_prompt for kw in ["分析", "比较", "为什么", "评估"]):
-                thinking_prompt += (
-                    "请使用结构化分析框架：\n"
-                    "1. 问题拆解：识别核心要素和相互关系\n"
-                    "2. 多角度分析：从技术、业务、用户等维度展开\n"
-                    "3. 证据支撑：引用相关原理、数据或最佳实践\n"
-                    "4. 权衡评估：分析各方案的优缺点\n"
-                    "5. 结论建议：给出明确、可落地的建议"
-                )
-            elif len(current_prompt) > 2000:
-                thinking_prompt += (
-                    "这是一篇长文档，请利用长上下文优势：\n"
-                    "1. 整体把握：先总结核心主题和整体结构\n"
-                    "2. 关键点提取：识别重要论点、数据、结论\n"
-                    "3. 深度解读：对关键部分进行详细分析\n"
-                    "4. 关联整合：将不同部分的信息关联起来"
-                )
-            else:
-                thinking_prompt += (
-                    "请展示思考过程：\n"
-                    "• 理解问题核心诉求\n"
-                    "• 分析关键信息和约束条件\n"
-                    "• 逻辑推导，逐步构建答案\n"
-                    "• 验证结论的准确性和完整性\n"
-                    "• 给出清晰、准确的最终回答"
-                )
-            
-            prompt_to_send += thinking_prompt
-        
-        else:
-            prompt_to_send += "\n\n请详细展示你的思考步骤，然后再给出最终回答。"
-
-    for m in st.session_state.messages:
-        if m["role"] == "user":
-            msgs.append({"role": "user", "content": m["content"]})
-        elif m["role"] == "assistant" and m.get("model_id") == model_id:
-            content = m["content"].split("]: ", 1)[-1] if "]: " in m["content"] else m["content"]
-            msgs.append({"role": "assistant", "content": content})
-    
-    msgs.append({"role": "user", "content": prompt_to_send})
-    return msgs
-
-# 6. 核心对话逻辑
-# 渲染历史
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        display_content = msg["content"].split("]: ", 1)[-1] if "]: " in msg["content"] else msg["content"]
-        st.markdown(display_content)
-
+# 8. 核心对话逻辑
 # 输入处理
 if prompt := st.chat_input("向选中的 AI 模型提问..."):
     with st.chat_message("user"):
@@ -530,8 +594,13 @@ if prompt := st.chat_input("向选中的 AI 模型提问..."):
                         else:
                             status.update(label=f"✅ {cfg['name']} 完成", state="complete")
                     
-                    # 显示答案
+                    # 显示答案 + 复制按钮
                     st.markdown(ans)
+                    copy_button(
+                        f"[{cfg['name']}]\n\n{ans}",
+                        key=f"single_{mid}_{uuid.uuid4().hex[:8]}",
+                        label="📋 复制本模型答案"
+                    )
                     
                     # 【DeepSeek优化】增强的资源展示
                     if mid == "deepseek" and usage_info:
@@ -653,6 +722,20 @@ if prompt := st.chat_input("向选中的 AI 模型提问..."):
                     
                     else:
                         st.error(f"调用失败: {error_msg[:100]}")
+
+        # ✅ 一键复制全部模型回答（本轮汇总）
+        if new_responses:
+            all_text = "\n\n" + ("-" * 30) + "\n\n".join(
+                [f"[{MODEL_CONFIG[item['mid']]['name']}]\n\n{item['ans']}" for item in new_responses]
+            )
+
+            st.write("---")
+            st.subheader("🧾 本轮模型回答汇总")
+            copy_button(
+                all_text,
+                key=f"all_{uuid.uuid4().hex[:8]}",
+                label="📋 一键复制全部模型回答"
+            )
 
         # 持久化
         if new_responses:
