@@ -111,7 +111,7 @@ MODEL_CONFIG = {
     "web_url": "https://chat.mistral.ai/",
     "emoji": "🦉",
     "env_key": "MISTRAL_API_KEY",
-    "system_prompt": """你是 Le Chat，由 Mistral AI 创建的 AI 助手。
+    "system": """你是 Le Chat，由 Mistral AI 创建的 AI 助手。
 1. 以简洁、专业的方式回答问题。
 2. 如果用户问及你的身份，回答：“我是 Le Chat，由 Mistral AI 创建的 AI 助手。”
 3. 避免提及模型版本或技术细节，除非用户明确要求。
