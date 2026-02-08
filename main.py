@@ -36,12 +36,25 @@ MODEL_CONFIG = {
         ),
         "params": {"temperature": 0.7, "max_tokens": 8192, "reasoning_effort": "medium"}
     },
-    "gemini": {
-        "name": "Gemini 2.5 Flash", "model": "gemini-2.5-flash", "emoji": "✨",
-        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/", "web_url": "https://gemini.google.com/",
-        "env_key": "GEMINI_API_KEY", "system": "You are Gemini by Google.",
-        "params": {"temperature": 0.7, "max_tokens": 8192}
-    },
+     "gemini": {
+            "name": "Gemini 2.0 Flash", 
+            "model": "gemini-2.0-flash", 
+            "emoji": "✨",
+            # 优化：使用标准 v1beta OpenAI 适配地址
+            "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/", 
+            "web_url": "https://aistudio.google.com/",
+            "env_key": "GEMINI_API_KEY", 
+            "system": (
+                "你是 Gemini 2.0 Flash，由 Google 开发的最新一代多模态大模型。\n"
+                "你擅长超长上下文处理、极速响应和复杂的跨领域任务。\n"
+                "请以专业、清晰且富有逻辑的方式回答用户。"
+            ),
+            "params": {
+                "temperature": 1.0, 
+                "max_tokens": 65536, # Gemini 2.0 支持极大的输出长度
+                "top_p": 0.95
+            }
+        },
     # 【Kimi优化】修复base_url空格问题，优化配置
     "kimi": {
         "name": "Kimi K2.5", 
