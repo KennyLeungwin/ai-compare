@@ -161,76 +161,82 @@ with st.sidebar:
         st.write(f"{config['emoji']} [{config['name']}]({config['web_url']}): {status}")
 
     st.write("---")
+    
+    # 【DeepSeek优化】将DeepSeek专属设置移到高级设置外面
+    if enabled_models.get("deepseek"):
+        with st.expander("🚀 DeepSeek 专属设置", expanded=True):
+            st.caption("🚀 业界领先推理能力 | 128K上下文 | 代码生成专家")
+            
+            # 推理强度配置
+            reasoning_level = st.select_slider(
+                "推理强度配置", 
+                options=["low", "medium", "high"],
+                value=st.session_state.deepseek_reasoning_level,
+                format_func=lambda x: {
+                    "low": "轻度推理 - 快速响应",
+                    "medium": "平衡模式 - 推荐", 
+                    "high": "深度推理 - 最准确"
+                }.get(x, x)
+            )
+            st.session_state.deepseek_reasoning_level = reasoning_level
+            
+            # 回答风格配置
+            style_options = ["detailed", "concise", "technical", "educational", "creative"]
+            style_labels = {
+                "detailed": "详细模式 - 展示完整推理过程",
+                "concise": "简洁模式 - 直接给出答案",
+                "technical": "技术模式 - 专业术语和详细分析",
+                "educational": "教育模式 - 分步讲解，适合学习",
+                "creative": "创意模式 - 灵活发挥，适合写作和创意"
+            }
+            
+            selected_label = st.selectbox(
+                "回答风格配置",
+                options=[style_labels[opt] for opt in style_options],
+                index=style_options.index(st.session_state.deepseek_style) if st.session_state.deepseek_style in style_options else 0,
+                key="deepseek_style_select"
+            )
+            
+            for key, label in style_labels.items():
+                if label == selected_label:
+                    st.session_state.deepseek_style = key
+                    break
+            
+            # 实时网络搜索
+            st.session_state.deepsearch_enabled = st.toggle(
+                "启用实时网络搜索", 
+                value=st.session_state.deepsearch_enabled,
+                help="需要API Key支持联网搜索功能"
+            )
+            
+            # 数学专用模式
+            st.session_state.math_mode = st.toggle(
+                "数学专用模式",
+                value=False,
+                help="针对数学问题优化，增强计算精度和步骤展示"
+            )
+            
+            # Token使用监控
+            show_token_usage = st.toggle(
+                "显示Token使用详情",
+                value=True,
+                help="显示详细的Token使用统计"
+            )
+    
+    # 高级设置（不再包含DeepSeek专属设置）
     with st.expander("高级设置"):
         st.subheader("🧠 思考模式")
         thinking_mode = st.toggle("启用全局思考模式", value=True, help="思考模式会显式引导模型进行逻辑推理")
         
-        # 【DeepSeek优化】深度推理配置
-        if enabled_models.get("deepseek"):
-            with st.expander("🚀 DeepSeek 专属设置", expanded=True):
-                st.caption("🚀 业界领先推理能力 | 128K上下文 | 代码生成专家")
-                
-                # 推理强度配置
-                reasoning_level = st.select_slider(
-                    "推理强度配置", 
-                    options=["low", "medium", "high"],
-                    value=st.session_state.deepseek_reasoning_level,
-                    format_func=lambda x: {
-                        "low": "轻度推理 - 快速响应",
-                        "medium": "平衡模式 - 推荐", 
-                        "high": "深度推理 - 最准确"
-                    }.get(x, x)
-                )
-                st.session_state.deepseek_reasoning_level = reasoning_level
-                
-                # 回答风格配置
-                style_options = ["detailed", "concise", "technical", "educational", "creative"]
-                style_labels = {
-                    "detailed": "详细模式 - 展示完整推理过程",
-                    "concise": "简洁模式 - 直接给出答案",
-                    "technical": "技术模式 - 专业术语和详细分析",
-                    "educational": "教育模式 - 分步讲解，适合学习",
-                    "creative": "创意模式 - 灵活发挥，适合写作和创意"
-                }
-                
-                selected_label = st.selectbox(
-                    "回答风格配置",
-                    options=[style_labels[opt] for opt in style_options],
-                    index=style_options.index(st.session_state.deepseek_style) if st.session_state.deepseek_style in style_options else 0,
-                    key="deepseek_style_select"
-                )
-                
-                for key, label in style_labels.items():
-                    if label == selected_label:
-                        st.session_state.deepseek_style = key
-                        break
-                
-                # 实时网络搜索
-                st.session_state.deepsearch_enabled = st.toggle(
-                    "启用实时网络搜索", 
-                    value=st.session_state.deepsearch_enabled,
-                    help="需要API Key支持联网搜索功能"
-                )
-                
-                # 数学专用模式
-                st.session_state.math_mode = st.toggle(
-                    "数学专用模式",
-                    value=False,
-                    help="针对数学问题优化，增强计算精度和步骤展示"
-                )
-                
-                # Token使用监控
-                show_token_usage = st.toggle(
-                    "显示Token使用详情",
-                    value=True,
-                    help="显示详细的Token使用统计"
-                )
+        # 这里不再包含DeepSeek的配置，已经移到上面了
+        
+        # 全局温度设置
+        global_temp = st.slider("全局温度", 0.0, 1.0, 0.7)
+        for mid in MODEL_CONFIG:
+            if mid != "kimi": # Kimi K2.5 固定为 1
+                MODEL_CONFIG[mid]["params"]["temperature"] = global_temp
 
-    global_temp = st.slider("全局温度", 0.0, 1.0, 0.7)
-    for mid in MODEL_CONFIG:
-        if mid != "kimi": # Kimi K2.5 固定为 1
-            MODEL_CONFIG[mid]["params"]["temperature"] = global_temp
-
+    # 其他模型的专属设置
     if enabled_models.get("qwen"):
         with st.expander("🌸 Qwen 专属增强"):
             st.session_state.enable_qwen_search = st.checkbox("🔍 启用联网搜索", value=st.session_state.enable_qwen_search)
@@ -257,7 +263,6 @@ with st.sidebar:
     if st.button("🗑️ 清空所有对话", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
-
 # 5. 辅助函数：隔离记忆
 def get_isolated_messages(model_id, current_prompt):
     cfg = MODEL_CONFIG[model_id]
