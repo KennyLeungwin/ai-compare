@@ -15,7 +15,7 @@ st.title("🧠 六模型聊天对比 (V13.0 - UI全回归版)")
 MODEL_CONFIG = {
     "deepseek": {
         "name": "DeepSeek-R1 Reasoning", "model": "deepseek-reasoner", "emoji": "🚀",
-        "base_url": "https://api.deepseek.com/v1 ", "web_url": "https://chat.deepseek.com ",
+        "base_url": "https://api.deepseek.com/v1", "web_url": "https://chat.deepseek.com",
         "env_key": "DEEPSEEK_API_KEY", 
         "system": (
             "你【就是】DeepSeek最新版，深度求索公司开发的顶尖推理模型。\n\n"
@@ -38,53 +38,48 @@ MODEL_CONFIG = {
     },
     "gemini": {
         "name": "Gemini 2.5 Flash", "model": "gemini-2.5-flash", "emoji": "✨",
-        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/ ", "web_url": "https://gemini.google.com/ ",
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/", "web_url": "https://gemini.google.com/",
         "env_key": "GEMINI_API_KEY", "system": "You are Gemini by Google.",
         "params": {"temperature": 0.7, "max_tokens": 8192}
     },
-    # 【Kimi优化1】升级模型配置：优化系统提示词、固定temperature=1.0、添加top_p和stream参数
+    # 【Kimi优化】修复base_url空格问题，优化配置
     "kimi": {
-        "name": "Kimi K2.5",  # 优化：更精确的命名
-        "model": "kimi-k2.5", 
+        "name": "Kimi K2.5", 
+        "model": "kimi-k2.5",  # 确认正确的模型ID
         "emoji": "🌙",
-        "base_url": "https://api.moonshot.cn/v1 ", 
-        "web_url": "https://kimi.moonshot.cn ",
-        "env_key": "KIMI_API_KEY", 
-        # 【Kimi优化】重写系统提示词，发挥256K上下文和MoE架构优势
+        "base_url": "https://api.moonshot.cn/v1",  # 修复：去除末尾空格！
+        "web_url": "https://kimi.moonshot.cn",
+        "env_key": "KIMI_API_KEY",
+        # 优化系统提示词
         "system": (
             "你是Kimi K2.5，由月之暗面（Moonshot AI）开发的先进多模态大语言模型。\n\n"
             "核心能力：\n"
-            "1. 256K超长上下文窗口，可一次性处理长篇文档、完整代码库或复杂多轮对话\n"
-            "2. 1万亿参数MoE架构，32B激活参数，在推理、编程、分析任务中表现卓越\n"
-            "3. 原生Agentic能力，支持工具调用、多步骤任务分解和自主执行\n"
-            "4. 深度思考模式（Thinking Mode），可展示完整推理链条\n\n"
+            "1. 256K超长上下文窗口，可处理长篇文档和复杂多轮对话\n"
+            "2. 1万亿参数MoE架构，32B激活参数，擅长推理、编程、分析任务\n"
+            "3. 原生Agentic能力，支持工具调用和多步骤任务分解\n"
+            "4. 深度思考模式，可展示完整推理链条\n\n"
             "回答准则：\n"
-            "- 复杂问题：先拆解分析，再逐步解决，展示思考过程\n"
-            "- 编程任务：提供完整可运行代码，考虑边界情况和错误处理\n"
-            "- 长文档：利用上下文优势保持全局一致性，避免碎片化回答\n"
-            "- 多轮对话：记住早期决策和约束条件，保持连贯性\n\n"
-            "风格要求：\n"
-            "- 中文表达自然流畅，避免翻译腔\n"
-            "- 技术解释准确且易懂，必要时使用类比\n"
-            "- 主动识别用户潜在需求，提供超预期信息"
+            "- 复杂问题先拆解分析，再逐步解决\n"
+            "- 编程任务提供完整可运行代码\n"
+            "- 长文档保持全局一致性\n"
+            "- 多轮对话记住早期决策，保持连贯性"
         ),
-        # 【Kimi优化】官方推荐参数：temperature固定1.0，添加top_p=0.95，强制stream=True
+        # 官方推荐参数
         "params": {
-            "temperature": 1.0,      # K2.5最佳工作温度，不可调整
-            "max_tokens": 32768,     # 默认32K输出，支持更长生成
-            "top_p": 0.95,          # 官方推荐，平衡多样性和连贯性
-            "stream": True,         # 强制流式，避免连接中断
+            "temperature": 1.0,      # 必须固定1.0
+            "max_tokens": 32768,     # 默认32K
+            "top_p": 0.95,          # 官方推荐
         }
     },
     "gpt": {
         "name": "GPT-3.5 Turbo", "model": "openai/gpt-3.5-turbo", "emoji": "💬",
-        "base_url": "https://openrouter.ai/api/v1 ", "web_url": "https://chat.openai.com ",
+        "base_url": "https://openrouter.ai/api/v1", "web_url": "https://chat.openai.com",
         "env_key": "OPENROUTER_API_KEY", "system": "You are ChatGPT.",
         "params": {"temperature": 0.7, "max_tokens": 2048}
     },
     "qwen": {
         "name": "通义千问 Max", "model": "qwen-max", "emoji": "🌸",
-        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1 ", "web_url": "https://www.qianwen.com/ ",
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "web_url": "https://www.qianwen.com/",
         "env_key": "QWEN_API_KEY",
         "system": (
             "You are Qwen-Max, a large-scale language model developed by Tongyi Lab. "
@@ -98,7 +93,7 @@ MODEL_CONFIG = {
     },
     "mistral": {
         "name": "Mistral Large", "model": "mistral-large-latest", "emoji": "🦉",
-        "base_url": "https://api.mistral.ai/v1 ", "web_url": "https://chat.mistral.ai/ ",
+        "base_url": "https://api.mistral.ai/v1", "web_url": "https://chat.mistral.ai/",
         "env_key": "MISTRAL_API_KEY", "system": "You are Mistral Large.",
         "params": {"temperature": 0.7, "max_tokens": 4096}
     }
@@ -111,7 +106,7 @@ if "enable_qwen_search" not in st.session_state:
     st.session_state.enable_qwen_search = False
 if "kimi_k25_enabled" not in st.session_state:
     st.session_state.kimi_k25_enabled = True
-# 【Kimi优化】新增Kimi专属状态变量
+# 【Kimi优化】新增Kimi专属状态
 if "kimi_thinking_enabled" not in st.session_state:
     st.session_state.kimi_thinking_enabled = True
 if "thinking_mode" not in st.session_state:
@@ -155,7 +150,6 @@ with st.sidebar:
         MODEL_CONFIG["deepseek"]["params"]["reasoning_effort"] = reasoning_level
         
         # 为DeepSeek添加回答风格选项
-        # 简化选项列表，避免复杂的元组结构
         style_options = ["detailed", "concise", "technical", "educational"]
         style_labels = {
             "detailed": "详细模式 - 展示完整推理过程",
@@ -164,7 +158,6 @@ with st.sidebar:
             "educational": "教育模式 - 分步讲解，适合学习"
         }
         
-        # 获取当前样式的索引
         current_index = style_options.index(st.session_state.deepseek_style) if st.session_state.deepseek_style in style_options else 0
         
         selected_label = st.selectbox(
@@ -174,7 +167,6 @@ with st.sidebar:
             key="deepseek_style_select"
         )
         
-        # 根据选中的标签找到对应的键
         for key, label in style_labels.items():
             if label == selected_label:
                 st.session_state.deepseek_style = key
@@ -182,34 +174,30 @@ with st.sidebar:
 
         global_temp = st.slider("全局温度", 0.0, 1.0, 0.7)
         for mid in MODEL_CONFIG:
-            if mid != "kimi": # Kimi K2.5 固定为 1，不受全局滑块影响
+            if mid != "kimi": # Kimi K2.5 固定为 1
                 MODEL_CONFIG[mid]["params"]["temperature"] = global_temp
 
     if enabled_models.get("qwen"):
         with st.expander("🌸 Qwen 专属增强"):
             st.session_state.enable_qwen_search = st.checkbox("🔍 启用联网搜索", value=st.session_state.enable_qwen_search)
 
-    # 【Kimi优化2】升级侧边栏配置面板：更详细的Kimi专属设置
+    # 【Kimi优化】升级侧边栏配置面板
     if enabled_models.get("kimi"):
         with st.expander("🌙 Kimi K2.5 专属增强", expanded=True):
-            st.caption("🚀 Kimi K2.5 | 256K上下文 | 1T参数MoE | 原生Agentic能力")
+            st.caption("🚀 256K上下文 | 1T参数MoE | 原生Agentic能力")
             
-            # 深度思考模式控制（独立于全局thinking_mode）
+            # 深度思考模式控制
             st.session_state.kimi_thinking_enabled = st.toggle(
-                "启用深度思考模式 (Thinking Mode)", 
+                "启用深度思考模式", 
                 value=st.session_state.kimi_thinking_enabled,
                 help="展示Kimi的完整推理链条，适合复杂分析任务"
             )
             
-            # 上下文利用率可视化
-            current_ctx = len(str(st.session_state.messages))  # 粗略估算
-            ctx_percent = min((current_ctx / 256000) * 100, 100)
-            st.progress(ctx_percent/100, text=f"当前上下文: ~{current_ctx//4} tokens (256K上限)")
+            # 模型选择提示
+            st.info("💡 如遇404错误，请确认：\n1. API Key已开通K2.5访问权限\n2. 账户余额充足\n3. 模型ID正确：kimi-k2.5")
             
-            # 温度提示（固定1.0，不可调）
-            st.caption("🌡️ 温度固定为1.0（K2.5官方推荐值，确保最佳性能）")
-            
-            st.info("💡 **Kimi优势场景**：长文档分析、代码生成、多步骤推理、复杂问题拆解")
+            # 温度提示（固定1.0）
+            st.caption("🌡️ 温度固定为1.0（K2.5官方推荐值）")
 
     st.write("---")
     if st.button("🗑️ 清空所有对话", use_container_width=True):
@@ -221,14 +209,11 @@ def get_isolated_messages(model_id, current_prompt):
     cfg = MODEL_CONFIG[model_id]
     msgs = [{"role": "system", "content": cfg['system']}]
     
-    # 思考模式注入 - 为DeepSeek定制专业的推理提示
     prompt_to_send = current_prompt
     if st.session_state.thinking_mode:
         if model_id == "deepseek":
-            # 为DeepSeek定制专业的推理链提示
             thinking_prompt = "\n\n【请使用Chain-of-Thought逐步推理】\n"
             
-            # 根据回答风格调整思考提示
             if st.session_state.deepseek_style == "detailed":
                 thinking_prompt += (
                     "第一步：理解问题核心和约束条件\n"
@@ -255,26 +240,25 @@ def get_isolated_messages(model_id, current_prompt):
                     "• 最后，总结知识点和关键结论\n"
                     "（请用通俗易懂的方式讲解）"
                 )
-            else:  # concise模式
+            else:
                 thinking_prompt = "\n\n请一步步推理并给出最终答案。"
             
             prompt_to_send += thinking_prompt
         
-        # 【Kimi优化3】新增Kimi专属深度思考提示词工程
+        # 【Kimi优化】新增Kimi专属思考提示
         elif model_id == "kimi":
             thinking_prompt = "\n\n【深度思考模式】\n"
             
-            # 根据问题类型动态调整思考策略
-            if any(kw in current_prompt for kw in ["代码", "编程", "debug", "code", "programming", "函数", "算法"]):
+            if any(kw in current_prompt for kw in ["代码", "编程", "debug", "code", "函数", "算法"]):
                 thinking_prompt += (
-                    "请按以下步骤处理这个编程任务：\n"
-                    "1. 需求解析：明确功能需求、输入输出格式、边界条件\n"
-                    "2. 方案设计：选择合适算法和数据结构，说明时间和空间复杂度\n"
-                    "3. 代码实现：编写完整、可运行的代码，包含必要注释\n"
-                    "4. 测试验证：提供测试用例，包括正常情况和边界情况\n"
-                    "5. 优化建议：指出可能的性能瓶颈和改进方向"
+                    "请按以下步骤处理编程任务：\n"
+                    "1. 需求解析：明确功能需求、输入输出、边界条件\n"
+                    "2. 方案设计：选择算法和数据结构，说明复杂度\n"
+                    "3. 代码实现：编写完整可运行代码，包含注释\n"
+                    "4. 测试验证：提供测试用例，包括边界情况\n"
+                    "5. 优化建议：指出性能瓶颈和改进方向"
                 )
-            elif any(kw in current_prompt for kw in ["分析", "比较", "为什么", "原因", "analysis", "compare", "评估", "评价"]):
+            elif any(kw in current_prompt for kw in ["分析", "比较", "为什么", "评估"]):
                 thinking_prompt += (
                     "请使用结构化分析框架：\n"
                     "1. 问题拆解：识别核心要素和相互关系\n"
@@ -283,19 +267,18 @@ def get_isolated_messages(model_id, current_prompt):
                     "4. 权衡评估：分析各方案的优缺点\n"
                     "5. 结论建议：给出明确、可落地的建议"
                 )
-            elif len(current_prompt) > 2000:  # 长文本处理
+            elif len(current_prompt) > 2000:
                 thinking_prompt += (
-                    "这是一篇长文档/复杂内容，请利用你的长上下文优势：\n"
+                    "这是一篇长文档，请利用长上下文优势：\n"
                     "1. 整体把握：先总结核心主题和整体结构\n"
                     "2. 关键点提取：识别重要论点、数据、结论\n"
                     "3. 深度解读：对关键部分进行详细分析\n"
-                    "4. 关联整合：将不同部分的信息关联起来\n"
-                    "5. 输出格式：使用清晰的标题层级，便于阅读"
+                    "4. 关联整合：将不同部分的信息关联起来"
                 )
             else:
                 thinking_prompt += (
-                    "请展示你的思考过程：\n"
-                    "• 先理解问题的核心诉求\n"
+                    "请展示思考过程：\n"
+                    "• 理解问题核心诉求\n"
                     "• 分析关键信息和约束条件\n"
                     "• 逻辑推导，逐步构建答案\n"
                     "• 验证结论的准确性和完整性\n"
@@ -305,14 +288,12 @@ def get_isolated_messages(model_id, current_prompt):
             prompt_to_send += thinking_prompt
         
         else:
-            # 其他模型保持原有提示
             prompt_to_send += "\n\n请详细展示你的思考步骤，然后再给出最终回答。"
 
     for m in st.session_state.messages:
         if m["role"] == "user":
             msgs.append({"role": "user", "content": m["content"]})
         elif m["role"] == "assistant" and m.get("model_id") == model_id:
-            # 提取存入时的纯净内容
             content = m["content"].split("]: ", 1)[-1] if "]: " in m["content"] else m["content"]
             msgs.append({"role": "assistant", "content": content})
     
@@ -352,38 +333,34 @@ if prompt := st.chat_input("向选中的 AI 模型提问..."):
                     
                     # 为DeepSeek优化参数
                     if mid == "deepseek":
-                        # 根据问题类型动态调整推理强度
                         if "数学" in prompt or "计算" in prompt or any(word in prompt.lower() for word in ["math", "calculate", "solve"]):
-                            params["reasoning_effort"] = "high"  # 数学问题用最高推理强度
+                            params["reasoning_effort"] = "high"
                         elif "代码" in prompt or "编程" in prompt or "program" in prompt.lower():
                             params["reasoning_effort"] = "medium"
-                            params["temperature"] = 0.3  # 代码问题需要更确定性
+                            params["temperature"] = 0.3
                         elif "创意" in prompt or "写作" in prompt or any(word in prompt.lower() for word in ["creative", "write", "story"]):
-                            params["temperature"] = 0.9  # 创意问题提高创造性
+                            params["temperature"] = 0.9
                             params["reasoning_effort"] = "medium"
                         
-                        # 根据问题长度调整max_tokens
                         if len(prompt) > 500:
-                            params["max_tokens"] = 16384  # 长问题需要更长回答
+                            params["max_tokens"] = 16384
                     
-                    # 【Kimi优化4】新增Kimi专属参数优化逻辑
+                    # 【Kimi优化】Kimi专属参数处理
                     if mid == "kimi":
-                        # 强制锁定官方推荐参数，不受全局滑块影响
-                        params["temperature"] = 1.0  # 必须固定1.0
-                        params["top_p"] = 0.95       # 官方推荐值
-                        params["stream"] = True      # 强制流式传输
+                        # 强制锁定官方推荐参数
+                        params["temperature"] = 1.0
+                        params["top_p"] = 0.95
                         
-                        # 动态调整max_tokens：长文档场景自动扩容
+                        # 动态调整max_tokens
                         if len(prompt) > 5000:
-                            params["max_tokens"] = 65536  # 长输入配长输出（64K）
-                        elif any(kw in prompt for kw in ["代码", "编程", "写作", "长文", "详细", "完整"]):
-                            params["max_tokens"] = 32768  # 生成任务需要更多token（32K）
+                            params["max_tokens"] = 65536
+                        elif any(kw in prompt for kw in ["代码", "编程", "写作", "长文", "详细"]):
+                            params["max_tokens"] = 32768
                         else:
-                            params["max_tokens"] = 16384  # 默认16K，平衡性能与速度
+                            params["max_tokens"] = 16384
                         
-                        # 启用原生Thinking模式（如果用户开启Kimi专属思考模式）
+                        # 启用原生Thinking模式（通过extra_body）
                         if st.session_state.kimi_thinking_enabled:
-                            # 注意：K2.5的thinking参数通过extra_body传递
                             params["extra_body"] = {"thinking": {"type": "enabled"}}
                     
                     # 其他模型的特殊处理保持不变
@@ -393,20 +370,15 @@ if prompt := st.chat_input("向选中的 AI 模型提问..."):
                     # 状态显示优化
                     if mid == "deepseek":
                         status_text = "🚀 DeepSeek深度推理中..." if st.session_state.thinking_mode else "🚀 DeepSeek回答中..."
-                    # 【Kimi优化】专属状态文本
                     elif mid == "kimi":
-                        if st.session_state.kimi_thinking_enabled:
-                            status_text = "🌙 Kimi深度思考中... (256K上下文 | MoE架构)"
-                        else:
-                            status_text = "🌙 Kimi回答中..."
+                        status_text = "🌙 Kimi深度思考中..." if st.session_state.kimi_thinking_enabled else "🌙 Kimi回答中..."
                     else:
                         status_text = f"{cfg['emoji']} 思考中..." if st.session_state.thinking_mode else f"{cfg['emoji']} 回答中..."
                     
                     usage_info = None
-                    reasoning_content = None  # 【Kimi优化】用于存储思考过程
+                    reasoning_content = None
                     
                     with st.status(status_text) as status:
-                        # DeepSeek在思考模式下展示推理过程
                         resp = client.chat.completions.create(
                             model=cfg['model'],
                             messages=get_isolated_messages(mid, prompt),
@@ -414,32 +386,28 @@ if prompt := st.chat_input("向选中的 AI 模型提问..."):
                         )
                         ans = resp.choices[0].message.content
                         
-                        # 保存使用信息，稍后显示
-                        if mid == "deepseek" and hasattr(resp, 'usage'):
+                        # 保存使用信息
+                        if hasattr(resp, 'usage'):
                             usage_info = resp.usage
                         
-                        # 【Kimi优化】捕获Kimi的reasoning_content（如果API返回）
+                        # 捕获Kimi的reasoning_content
                         if mid == "kimi":
                             reasoning_content = getattr(resp.choices[0].message, 'reasoning_content', None)
-                            if hasattr(resp, 'usage'):
-                                usage_info = resp.usage
                         
-                        # 先更新状态，然后显示答案
+                        # 更新状态
                         if mid == "deepseek":
                             status.update(label=f"✅ DeepSeek推理完成" if st.session_state.thinking_mode else f"✅ DeepSeek回答完成", state="complete")
-                        # 【Kimi优化】专属完成状态
                         elif mid == "kimi":
                             label = "✅ Kimi深度思考完成" if st.session_state.kimi_thinking_enabled else "✅ Kimi回答完成"
                             status.update(label=label, state="complete")
                         else:
                             status.update(label=f"✅ {cfg['name']} 完成", state="complete")
                     
-                    # 在status块外部显示答案和扩展信息
+                    # 显示答案
                     st.markdown(ans)
                     
-                    # DeepSeek专属：显示推理资源使用信息（在status块外部）
+                    # DeepSeek专属资源展示
                     if mid == "deepseek" and usage_info:
-                        # 使用st.info或st.caption而不是expander来避免嵌套问题
                         st.caption("🧠 推理资源使用:")
                         cols_usage = st.columns(3)
                         with cols_usage[0]:
@@ -451,14 +419,14 @@ if prompt := st.chat_input("向选中的 AI 模型提问..."):
                             with cols_usage[2]:
                                 st.metric("提示Tokens", usage_info.prompt_tokens)
                     
-                    # 【Kimi优化5】新增Kimi专属：显示思考过程和Token使用情况
+                    # 【Kimi优化】Kimi专属展示
                     if mid == "kimi":
-                        # 显示思考过程（如果API返回且用户启用了思考模式）
+                        # 显示思考过程
                         if reasoning_content and st.session_state.kimi_thinking_enabled:
                             with st.expander("🧠 Kimi的思考过程", expanded=False):
                                 st.markdown(reasoning_content)
                         
-                        # 显示Token使用情况（利用256K上下文优势）
+                        # 显示Token使用情况
                         if usage_info:
                             with st.expander("📊 Token使用情况", expanded=False):
                                 cols_usage = st.columns(3)
@@ -469,42 +437,70 @@ if prompt := st.chat_input("向选中的 AI 模型提问..."):
                                 with cols_usage[2]:
                                     st.metric("总Tokens", usage_info.total_tokens)
                                 
-                                # 计算上下文利用率（展示256K优势）
                                 ctx_percent = (usage_info.prompt_tokens / 256000) * 100
                                 st.progress(min(ctx_percent/100, 1.0), 
                                            text=f"上下文利用率: {ctx_percent:.1f}% (256K窗口)")
-                                
-                                st.caption("💡 Kimi K2.5的256K上下文让您可以处理超长文档而无需截断")
                     
                     new_responses.append({"mid": mid, "ans": ans})
                     
                 except Exception as e:
+                    error_msg = str(e)
+                    
                     if mid == "deepseek":
-                        # 为DeepSeek提供更详细的错误信息
-                        st.error(f"DeepSeek调用失败: {str(e)[:150]}")
-                        # 使用st.info而不是expander来避免嵌套问题
+                        st.error(f"DeepSeek调用失败: {error_msg[:150]}")
                         st.info("""
                         **DeepSeek专属排查建议:**
-                        1. 检查API密钥是否在 https://platform.deepseek.com/api_keys  创建
+                        1. 检查API密钥是否在 https://platform.deepseek.com/api_keys 创建
                         2. 确认账户余额充足（新用户有免费额度）
                         3. 推理模型需要指定 reasoning_effort 参数
                         4. 检查网络连接，特别是国际网络访问
                         """)
-                    # 【Kimi优化】新增Kimi专属错误处理
+                    
+                    # 【Kimi优化】增强错误处理
                     elif mid == "kimi":
-                        st.error(f"Kimi调用失败: {str(e)[:150]}")
-                        st.info("""
-                        **Kimi专属排查建议:**
-                        1. 检查API密钥是否在 https://platform.moonshot.cn  创建
-                        2. 确认账户有可用余额（K2.5模型需要单独授权）
-                        3. 检查是否启用了Thinking模式（某些账户可能需要申请）
-                        4. 长上下文请求（>128K）可能需要预热或分批处理
-                        5. 如遇到连接中断，stream=True参数应自动处理，如仍失败请检查网络
-                        """)
+                        st.error(f"Kimi调用失败: {error_msg[:200]}")
+                        
+                        # 根据错误类型提供针对性建议
+                        if "404" in error_msg or "not_found" in error_msg.lower():
+                            st.error("🚨 404错误：模型未找到")
+                            st.info("""
+                            **可能原因及解决方案:**
+                            
+                            1. **模型ID错误** 
+                               - 当前使用的模型ID: `kimi-k2.5`
+                               - 请确认这是您账户中可用的模型ID
+                               - 可尝试在 https://platform.moonshot.cn/docs/guide/kimi-k2-5-quickstart 查看最新模型名称
+                            
+                            2. **API Key无K2.5权限**
+                               - Kimi K2.5需要单独申请访问权限
+                               - 请在 https://platform.moonshot.cn 查看您的可用模型列表
+                               - 如未开通，可申请开通或联系客服
+                            
+                            3. **账户余额不足**
+                               - 检查账户是否有可用余额
+                               - 新用户通常有免费额度，但可能不包含K2.5
+                            
+                            4. **base_url错误**
+                               - 当前使用的base_url: `https://api.moonshot.cn/v1`
+                               - 请确认与您注册的区域一致（国内版/国际版）
+                            """)
+                        elif "401" in error_msg or "unauthorized" in error_msg.lower():
+                            st.error("🚨 401错误：API Key无效")
+                            st.info("请检查 KIMI_API_KEY 环境变量是否正确设置")
+                        elif "429" in error_msg:
+                            st.error("🚨 429错误：请求过于频繁")
+                            st.info("请稍后再试，或检查账户的RPM/TPM限制")
+                        else:
+                            st.info(f"""
+                            **一般排查建议:**
+                            - 错误详情: {error_msg[:300]}
+                            - 请查看 https://platform.moonshot.cn/docs/guide/faq 获取帮助
+                            """)
+                    
                     else:
-                        st.error(f"调用失败: {str(e)[:100]}")
+                        st.error(f"调用失败: {error_msg[:100]}")
 
-        # 持久化：将本次对话存入 session_state
+        # 持久化
         if new_responses:
             st.session_state.messages.append({"role": "user", "content": prompt})
             for item in new_responses:
