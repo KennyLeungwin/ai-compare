@@ -111,12 +111,11 @@ MODEL_CONFIG = {
         "web_url": "https://chat.mistral.ai/",
         "emoji": "🦉",
         "env_key": "MISTRAL_API_KEY",
-        # 增加以下字段：
-        "system_prompt": """你是 Le Chat，由 Mistral AI 创建的 AI 助手。
-    1. 以简洁、专业的方式回答问题。
-    2. 如果用户问及你的身份，回答："我是 Le Chat，由 Mistral AI 创建的 AI 助手。"
-    3. 避免提及模型版本或技术细节，除非用户明确要求。
-    4. 优先解决用户的问题，保持回答的实用性和准确性。""",
+        "system": """你是 Le Chat，由 Mistral AI 创建的 AI 助手。
+1. 以简洁、专业的方式回答问题。
+2. 如果用户问及你的身份，回答："我是 Le Chat，由 Mistral AI 创建的 AI 助手。"
+3. 避免提及模型版本或技术细节，除非用户明确要求。
+4. 优先解决用户的问题，保持回答的实用性和准确性。""",
         "params": {
             "temperature": 0.7,
             "max_tokens": 8192,
@@ -125,29 +124,29 @@ MODEL_CONFIG = {
     }
 }
 
-# 3. 初始化会话状态（修复：添加所有需要的状态变量）
+# 3. 初始化会话状态
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "enable_qwen_search" not in st.session_state:
     st.session_state.enable_qwen_search = False
 if "kimi_k25_enabled" not in st.session_state:
     st.session_state.kimi_k25_enabled = True
-if "kimi_thinking_enabled" not in st.session_state:  # 修复：添加这个状态变量
+# 【Kimi优化】新增Kimi专属状态
+if "kimi_thinking_enabled" not in st.session_state:
     st.session_state.kimi_thinking_enabled = True
-if "thinking_mode" not in st.session_state:  # 修复：确保这个状态变量存在
+if "thinking_mode" not in st.session_state:
     st.session_state.thinking_mode = True
-# 【DeepSeek优化】新增DeepSeek专属状态
+# 新增：DeepSeek回答风格配置
 if "deepseek_style" not in st.session_state:
     st.session_state.deepseek_style = "detailed"
-if "deepseek_thinking_enabled" not in st.session_state:
-    st.session_state.deepseek_thinking_enabled = True
+# 【DeepSeek优化】新增专属状态
 if "deepseek_reasoning_level" not in st.session_state:
     st.session_state.deepseek_reasoning_level = "medium"
 if "deepsearch_enabled" not in st.session_state:
     st.session_state.deepsearch_enabled = False
-if "math_mode" not in st.session_state:  # 修复：添加math_mode状态变量
+if "math_mode" not in st.session_state:
     st.session_state.math_mode = False
-if "show_token_usage" not in st.session_state:  # 修复：添加show_token_usage状态变量
+if "show_token_usage" not in st.session_state:
     st.session_state.show_token_usage = True
 
 # 4. 侧边栏 UI (完整回归)
@@ -168,7 +167,7 @@ with st.sidebar:
 
     st.write("---")
     
-    # 【DeepSeek优化】将DeepSeek专属设置移到高级设置外面
+    # 【DeepSeek优化】添加独立配置面板
     if enabled_models.get("deepseek"):
         with st.expander("🚀 DeepSeek 专属设置", expanded=True):
             st.caption("🚀 业界领先推理能力 | 128K上下文 | 代码生成专家")
@@ -186,7 +185,7 @@ with st.sidebar:
             )
             st.session_state.deepseek_reasoning_level = reasoning_level
             
-            # 回答风格配置
+            # 回答风格配置（扩展选项）
             style_options = ["detailed", "concise", "technical", "educational", "creative"]
             style_labels = {
                 "detailed": "详细模式 - 展示完整推理过程",
@@ -229,18 +228,51 @@ with st.sidebar:
                 help="显示详细的Token使用统计"
             )
     
-    # 高级设置（不再包含DeepSeek专属设置）
     with st.expander("高级设置"):
         st.subheader("🧠 思考模式")
-        st.session_state.thinking_mode = st.toggle("启用全局思考模式", value=st.session_state.thinking_mode, help="思考模式会显式引导模型进行逻辑推理")
+        st.session_state.thinking_mode = st.toggle("启用思考模式", value=st.session_state.thinking_mode, help="思考模式会显式引导模型进行逻辑推理")
         
-        # 全局温度设置
+        # 【DeepSeek优化】保持原有配置兼容性
+        reasoning_level = st.select_slider(
+            "DeepSeek 推理强度", 
+            options=["low", "medium", "high"],
+            value=st.session_state.deepseek_reasoning_level,
+            format_func=lambda x: {
+                "low": "轻度推理 - 快速响应",
+                "medium": "平衡模式 - 推荐", 
+                "high": "深度推理 - 最准确"
+            }.get(x, x)
+        )
+        st.session_state.deepseek_reasoning_level = reasoning_level
+        
+        # 为DeepSeek添加回答风格选项
+        style_options = ["detailed", "concise", "technical", "educational"]
+        style_labels = {
+            "detailed": "详细模式 - 展示完整推理过程",
+            "concise": "简洁模式 - 直接给出答案",
+            "technical": "技术模式 - 专业术语和详细分析",
+            "educational": "教育模式 - 分步讲解，适合学习"
+        }
+        
+        current_index = style_options.index(st.session_state.deepseek_style) if st.session_state.deepseek_style in style_options else 0
+        
+        selected_label = st.selectbox(
+            "DeepSeek回答风格",
+            options=[style_labels[opt] for opt in style_options],
+            index=current_index,
+            key="deepseek_style_select_legacy"
+        )
+        
+        for key, label in style_labels.items():
+            if label == selected_label:
+                st.session_state.deepseek_style = key
+                break
+
         global_temp = st.slider("全局温度", 0.0, 1.0, 0.7)
         for mid in MODEL_CONFIG:
             if mid != "kimi": # Kimi K2.5 固定为 1
                 MODEL_CONFIG[mid]["params"]["temperature"] = global_temp
 
-    # 其他模型的专属设置
     if enabled_models.get("qwen"):
         with st.expander("🌸 Qwen 专属增强"):
             st.session_state.enable_qwen_search = st.checkbox("🔍 启用联网搜索", value=st.session_state.enable_qwen_search)
@@ -274,101 +306,99 @@ def get_isolated_messages(model_id, current_prompt):
     msgs = [{"role": "system", "content": cfg['system']}]
     
     prompt_to_send = current_prompt
-    
-    # 【DeepSeek优化】增强的思考提示
-    if model_id == "deepseek" and st.session_state.thinking_mode:
-        thinking_prompt = "\n\n【DeepSeek推理模式】\n"
+    if st.session_state.thinking_mode:
+        if model_id == "deepseek":
+            thinking_prompt = "\n\n【请使用Chain-of-Thought逐步推理】\n"
+            
+            if st.session_state.deepseek_style == "detailed":
+                thinking_prompt += (
+                    "第一步：理解问题核心和约束条件\n"
+                    "第二步：拆解问题，分析关键要素\n"
+                    "第三步：逻辑推导，展示推理链条\n"
+                    "第四步：验证结果，确保逻辑一致性\n"
+                    "第五步：给出清晰、准确的最终答案\n"
+                    "（如果涉及数学计算，请展示详细计算过程）"
+                )
+            elif st.session_state.deepseek_style == "technical":
+                thinking_prompt += (
+                    "1. 问题分析：识别核心问题和约束条件\n"
+                    "2. 方法论选择：确定适用的分析方法\n"
+                    "3. 逐步推导：展示严谨的逻辑推导过程\n"
+                    "4. 结果验证：检查推导的合理性和一致性\n"
+                    "5. 结论：给出准确的技术性结论"
+                )
+            elif st.session_state.deepseek_style == "educational":
+                thinking_prompt += (
+                    "📚 教学式思考：\n"
+                    "• 首先，让我们理解这个问题在问什么\n"
+                    "• 其次，我们一步步分析解决思路\n"
+                    "• 然后，详细展示每个步骤的原理\n"
+                    "• 最后，总结知识点和关键结论\n"
+                    "（请用通俗易懂的方式讲解）"
+                )
+            elif st.session_state.deepseek_style == "concise":
+                thinking_prompt = "\n\n请直接给出最准确的答案。"
+            elif st.session_state.deepseek_style == "creative":
+                thinking_prompt += (
+                    "✨ 请展现创意和想象力：\n"
+                    "• 不拘泥于常规思维路径\n"
+                    "• 展现独特的视角和见解\n"
+                    "• 语言生动有趣，富有感染力\n"
+                    "• 在合理范围内大胆创新"
+                )
+            else:
+                thinking_prompt = "\n\n请一步步推理并给出最终答案。"
+            
+            # 【DeepSeek优化】数学模式增强
+            if st.session_state.math_mode and any(kw in current_prompt for kw in ["数学", "计算", "方程", "公式", "算", "+", "-", "*", "/", "="]):
+                thinking_prompt += "\n\n【数学模式】请特别注意：\n1. 每个计算步骤都要清晰展示\n2. 使用LaTeX格式表示数学公式\n3. 验证计算结果的合理性\n4. 提供多种解法（如适用）"
+            
+            prompt_to_send += thinking_prompt
         
-        if st.session_state.deepseek_style == "detailed":
-            thinking_prompt += (
-                "请使用Chain-of-Thought逐步推理：\n"
-                "第一步：理解问题核心和约束条件\n"
-                "第二步：拆解问题，分析关键要素\n"
-                "第三步：逻辑推导，展示推理链条\n"
-                "第四步：验证结果，确保逻辑一致性\n"
-                "第五步：给出清晰、准确的最终答案\n"
-                "（如果涉及数学计算，请展示详细计算过程）"
-            )
-        elif st.session_state.deepseek_style == "technical":
-            thinking_prompt += (
-                "请按照技术分析框架回答：\n"
-                "1. 问题分析：识别核心问题和约束条件\n"
-                "2. 方法论选择：确定适用的分析方法\n"
-                "3. 逐步推导：展示严谨的逻辑推导过程\n"
-                "4. 结果验证：检查推导的合理性和一致性\n"
-                "5. 结论：给出准确的技术性结论"
-            )
-        elif st.session_state.deepseek_style == "educational":
-            thinking_prompt += (
-                "📚 请使用教学式思考：\n"
-                "• 首先，让我们理解这个问题在问什么\n"
-                "• 其次，我们一步步分析解决思路\n"
-                "• 然后，详细展示每个步骤的原理\n"
-                "• 最后，总结知识点和关键结论\n"
-                "（请用通俗易懂的方式讲解）"
-            )
-        elif st.session_state.deepseek_style == "concise":
-            thinking_prompt = "\n\n请直接给出最准确的答案。"
-        elif st.session_state.deepseek_style == "creative":
-            thinking_prompt += (
-                "✨ 请展现创意和想象力：\n"
-                "• 不拘泥于常规思维路径\n"
-                "• 展现独特的视角和见解\n"
-                "• 语言生动有趣，富有感染力\n"
-                "• 在合理范围内大胆创新"
-            )
+        # 【Kimi优化】新增Kimi专属思考提示
+        elif model_id == "kimi":
+            thinking_prompt = "\n\n【深度思考模式】\n"
+            
+            if any(kw in current_prompt for kw in ["代码", "编程", "debug", "code", "函数", "算法"]):
+                thinking_prompt += (
+                    "请按以下步骤处理编程任务：\n"
+                    "1. 需求解析：明确功能需求、输入输出、边界条件\n"
+                    "2. 方案设计：选择算法和数据结构，说明复杂度\n"
+                    "3. 代码实现：编写完整可运行代码，包含注释\n"
+                    "4. 测试验证：提供测试用例，包括边界情况\n"
+                    "5. 优化建议：指出性能瓶颈和改进方向"
+                )
+            elif any(kw in current_prompt for kw in ["分析", "比较", "为什么", "评估"]):
+                thinking_prompt += (
+                    "请使用结构化分析框架：\n"
+                    "1. 问题拆解：识别核心要素和相互关系\n"
+                    "2. 多角度分析：从技术、业务、用户等维度展开\n"
+                    "3. 证据支撑：引用相关原理、数据或最佳实践\n"
+                    "4. 权衡评估：分析各方案的优缺点\n"
+                    "5. 结论建议：给出明确、可落地的建议"
+                )
+            elif len(current_prompt) > 2000:
+                thinking_prompt += (
+                    "这是一篇长文档，请利用长上下文优势：\n"
+                    "1. 整体把握：先总结核心主题和整体结构\n"
+                    "2. 关键点提取：识别重要论点、数据、结论\n"
+                    "3. 深度解读：对关键部分进行详细分析\n"
+                    "4. 关联整合：将不同部分的信息关联起来"
+                )
+            else:
+                thinking_prompt += (
+                    "请展示思考过程：\n"
+                    "• 理解问题核心诉求\n"
+                    "• 分析关键信息和约束条件\n"
+                    "• 逻辑推导，逐步构建答案\n"
+                    "• 验证结论的准确性和完整性\n"
+                    "• 给出清晰、准确的最终回答"
+                )
+            
+            prompt_to_send += thinking_prompt
         
-        # 数学模式增强
-        if st.session_state.math_mode and any(kw in current_prompt for kw in ["数学", "计算", "方程", "公式", "算", "+", "-", "*", "/", "="]):
-            thinking_prompt += "\n\n【数学模式】请特别注意：\n1. 每个计算步骤都要清晰展示\n2. 使用LaTeX格式表示数学公式\n3. 验证计算结果的合理性\n4. 提供多种解法（如适用）"
-        
-        prompt_to_send += thinking_prompt
-    
-    # 【Kimi优化】新增Kimi专属思考提示
-    elif model_id == "kimi" and st.session_state.thinking_mode:
-        thinking_prompt = "\n\n【深度思考模式】\n"
-        
-        if any(kw in current_prompt for kw in ["代码", "编程", "debug", "code", "函数", "算法"]):
-            thinking_prompt += (
-                "请按以下步骤处理编程任务：\n"
-                "1. 需求解析：明确功能需求、输入输出、边界条件\n"
-                "2. 方案设计：选择算法和数据结构，说明复杂度\n"
-                "3. 代码实现：编写完整可运行代码，包含注释\n"
-                "4. 测试验证：提供测试用例，包括边界情况\n"
-                "5. 优化建议：指出性能瓶颈和改进方向"
-            )
-        elif any(kw in current_prompt for kw in ["分析", "比较", "为什么", "评估"]):
-            thinking_prompt += (
-                "请使用结构化分析框架：\n"
-                "1. 问题拆解：识别核心要素和相互关系\n"
-                "2. 多角度分析：从技术、业务、用户等维度展开\n"
-                "3. 证据支撑：引用相关原理、数据或最佳实践\n"
-                "4. 权衡评估：分析各方案的优缺点\n"
-                "5. 结论建议：给出明确、可落地的建议"
-            )
-        elif len(current_prompt) > 2000:
-            thinking_prompt += (
-                "这是一篇长文档，请利用长上下文优势：\n"
-                "1. 整体把握：先总结核心主题和整体结构\n"
-                "2. 关键点提取：识别重要论点、数据、结论\n"
-                "3. 深度解读：对关键部分进行详细分析\n"
-                "4. 关联整合：将不同部分的信息关联起来"
-            )
         else:
-            thinking_prompt += (
-                "请展示思考过程：\n"
-                "• 理解问题核心诉求\n"
-                "• 分析关键信息和约束条件\n"
-                "• 逻辑推导，逐步构建答案\n"
-                "• 验证结论的准确性和完整性\n"
-                "• 给出清晰、准确的最终回答"
-            )
-        
-        prompt_to_send += thinking_prompt
-    
-    # 其他模型的思考模式
-    elif st.session_state.thinking_mode and model_id not in ["deepseek", "kimi"]:
-        prompt_to_send += "\n\n请详细展示你的思考步骤，然后再给出最终回答。"
+            prompt_to_send += "\n\n请详细展示你的思考步骤，然后再给出最终回答。"
 
     for m in st.session_state.messages:
         if m["role"] == "user":
@@ -505,24 +535,25 @@ if prompt := st.chat_input("向选中的 AI 模型提问..."):
                     
                     # 【DeepSeek优化】增强的资源展示
                     if mid == "deepseek" and usage_info:
-                        with st.expander("📊 DeepSeek推理资源详情", expanded=st.session_state.show_token_usage):
-                            cols_usage = st.columns(4)
-                            with cols_usage[0]:
-                                st.metric("总Tokens", usage_info.total_tokens)
-                            if hasattr(usage_info, 'completion_tokens'):
-                                with cols_usage[1]:
-                                    st.metric("生成Tokens", usage_info.completion_tokens)
-                            if hasattr(usage_info, 'prompt_tokens'):
-                                with cols_usage[2]:
-                                    st.metric("提示Tokens", usage_info.prompt_tokens)
-                            if hasattr(usage_info, 'reasoning_tokens'):
-                                with cols_usage[3]:
-                                    st.metric("推理Tokens", usage_info.reasoning_tokens)
-                        
-                        # 推理效率分析
-                        if hasattr(usage_info, 'prompt_tokens') and hasattr(usage_info, 'completion_tokens'):
-                            efficiency = (usage_info.completion_tokens / usage_info.prompt_tokens) if usage_info.prompt_tokens > 0 else 0
-                            st.caption(f"🧮 推理效率: {efficiency:.2f} (生成/提示比率)")
+                        if st.session_state.show_token_usage:
+                            with st.expander("📊 DeepSeek推理资源详情", expanded=True):
+                                cols_usage = st.columns(4)
+                                with cols_usage[0]:
+                                    st.metric("总Tokens", usage_info.total_tokens)
+                                if hasattr(usage_info, 'completion_tokens'):
+                                    with cols_usage[1]:
+                                        st.metric("生成Tokens", usage_info.completion_tokens)
+                                if hasattr(usage_info, 'prompt_tokens'):
+                                    with cols_usage[2]:
+                                        st.metric("提示Tokens", usage_info.prompt_tokens)
+                                if hasattr(usage_info, 'reasoning_tokens'):
+                                    with cols_usage[3]:
+                                        st.metric("推理Tokens", usage_info.reasoning_tokens)
+                            
+                            # 推理效率分析
+                            if hasattr(usage_info, 'prompt_tokens') and hasattr(usage_info, 'completion_tokens'):
+                                efficiency = (usage_info.completion_tokens / usage_info.prompt_tokens) if usage_info.prompt_tokens > 0 else 0
+                                st.caption(f"🧮 推理效率: {efficiency:.2f} (生成/提示比率)")
                     
                     # 【Kimi优化】Kimi专属展示
                     if mid == "kimi":
