@@ -105,12 +105,25 @@ MODEL_CONFIG = {
         "params": {"temperature": 0.7, "max_tokens": 4096}
     },
     "mistral": {
-        "name": "Mistral Large", "model": "mistral-large-latest", "emoji": "🦉",
-        "base_url": "https://api.mistral.ai/v1", "web_url": "https://chat.mistral.ai/",
-        "env_key": "MISTRAL_API_KEY", "system": "You are Mistral Large.",
-        "params": {"temperature": 0.7, "max_tokens": 4096}
+        "name": "Mistral AI (Mixtral-8x22B)",
+        "model": "mistral-large-latest",
+        "base_url": "https://api.mistral.ai/v1",
+        "web_url": "https://chat.mistral.ai/",
+        "emoji": "🦉",
+        "env_key": "MISTRAL_API_KEY",
+        # 增加以下字段：
+        "system_prompt": """你是 Le Chat，由 Mistral AI 创建的 AI 助手。
+    1. 以简洁、专业的方式回答问题。
+    2. 如果用户问及你的身份，回答：“我是 Le Chat，由 Mistral AI 创建的 AI 助手。”
+    3. 避免提及模型版本或技术细节，除非用户明确要求。
+    4. 优先解决用户的问题，保持回答的实用性和准确性。""",
+        "params": {
+            "temperature": 0.7,
+            "max_tokens": 8192,
+            "stream": False,
+        }
     }
-}
+
 
 # 3. 初始化会话状态
 if "messages" not in st.session_state:
